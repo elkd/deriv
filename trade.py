@@ -24,10 +24,9 @@ if __name__ == '__main__':
         [sg.Text(size=(15,2))], #This is just for margin top bottom
         #[sg.Column([], pad=(10,  5))],
 
-        [sg.Text('Start Balance:'), sg.Text('0.00 USD', size=(8,1), key='_START_BAL_'),
-            sg.Text('Current Balance:'), sg.Text('0.00 USD', size=(12,1), key='_CURRENT_BAL_'),
-                sg.Text('Current Loss/Profit:'), sg.Text('0.00', size=(12,1), key='_STOP_EST_')],
-
+        #[sg.Text('Start Balance:'), sg.Text('0.00 USD', size=(8,1), key='_START_BAL_'),
+        #    sg.Text('Current Balance:'), sg.Text('0.00 USD', size=(12,1), key='_CURRENT_BAL_'),
+        #        sg.Text('Current Loss/Profit:'), sg.Text('0.00', size=(12,1), key='_STOP_EST_')],
 
         [sg.Text('Stop Loss:'), sg.Input(size=(7,1), k='_SL_'),
             sg.Text('Stop Profit:'), sg.Input(size=(7,1), k='_SP_'),
