@@ -1,0 +1,5 @@
+greenlet==1.1.2
+playwright==1.19.1
+pyee==8.1.0
+PySimpleGUI==4.57.0
+websockets==10.1
