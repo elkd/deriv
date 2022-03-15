@@ -5,7 +5,7 @@ from session import TradeSession
 
 def btn(name, key=secrets.token_urlsafe()):
     '''
-    # a PySimpleGUI "User Defined Element" (see docs)
+    # a PySimpleGUI "User Defined Element" (see PySimpleGUI docs)
     '''
     return sg.Button(name, key=key, size=(8, 1), pad=(2, 2))
 
@@ -44,6 +44,7 @@ if __name__ == '__main__':
     window = sg.Window(
                 'Deriv SmartTrader Bot',
                 layout,
+                keep_on_top=True,
                 element_justification='center',
                 finalize=True, resizable=True
             )

@@ -10,12 +10,9 @@ class TradeSession:
         self.stop_profit = 2
         self.loop = False
 
-        with sync_playwright() as playwright:
-            self.browser = playwright.chromium.launch(headless=False)
-            self.context = self.browser.new_context()
-
-            # Open new page
-            self.page = self.context.new_page()
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.launch(headless=False)
+        self.page = self.browser.new_page()
 
 
     def login(self, email, psword):
@@ -50,8 +47,11 @@ class TradeSession:
 
 
     def play(self, window, values):
-        print(values['_SK_'])
-        if not values['_SK_'] or not values['MG'] or not values['_LDP_']:
+        '''
+        Runs the smarttrader session with Volatility 100
+        in the Match/Differ settings
+        '''
+        if not values['_SK_'] or not values['_MG_'] or not values['_LDP_']:
             window['_MESSAGE_'].update('Please provide LDP, Stake and initial Martingale')
             return
 
@@ -114,6 +114,6 @@ class TradeSession:
 
 
     def exit(self):
-        self.context.close()
         self.browser.close()
+        self.playwright.stop()
         return
