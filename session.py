@@ -18,7 +18,7 @@ class TradeSession:
             self.page = self.context.new_page()
 
 
-    def login(email, psword):
+    def login(self, email, psword):
         # Go to https://smarttrader.deriv.com/
         self.page.goto("https://smarttrader.deriv.com/")
 
