@@ -1,6 +1,9 @@
+import asyncio
 import secrets
+import multiprocessing as mp
 import PySimpleGUI as sg
 from session import TradeSession
+from procs import prog_meter
 
 
 def btn(name, key=secrets.token_urlsafe()):
@@ -54,6 +57,7 @@ if __name__ == '__main__':
     #player = list_player.get_media_player()
 
     trade_session = TradeSession()
+    gui_queue = mp.Queue()
 
     while True:  # Event Loop
         event, values = window.read()
@@ -71,10 +75,12 @@ if __name__ == '__main__':
                     )
 
         if event == '_BUTTON_PLAY_':
-            trade_session.play(
-                    window, values
-                )
+            #asyncio.get_event_loop() instead of this
+            #try asyncio.get_all_loops(pick the one Playwright needs in a subprocess)
+            prog_meter(gui_queue, trade_session, window, values, asyncio.get_event_loop())
+
         if event == '_BUTTON_PAUSE_':
+            gui_queue.put('Stop')
             trade_session.pause()
 
         if event == '_BUTTON_STOP_':
