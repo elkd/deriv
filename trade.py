@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 import PySimpleGUI as sg
 from session import TradeSession
@@ -10,7 +11,14 @@ def btn(name, key=secrets.token_urlsafe()):
     return sg.Button(name, key=key, size=(8, 1), pad=(2, 2))
 
 
-if __name__ == '__main__':
+
+async def background():
+    while True:
+        print('background task run')
+        await asyncio.sleep(0)
+
+
+async def ui():
     sg.theme('BluePurple')
 
     layout = [
@@ -71,7 +79,7 @@ if __name__ == '__main__':
                     )
 
         if event == '_BUTTON_PLAY_':
-            trade_session.play(
+            await trade_session.play(
                     window, values
                 )
         if event == '_BUTTON_PAUSE_':
@@ -81,3 +89,14 @@ if __name__ == '__main__':
             trade_session.stop()
 
     window.close()
+
+
+
+async def main():
+    await asyncio.wait(
+            [background(), ui()]
+        )
+
+
+if __name__ == '__main__':
+    await main()
