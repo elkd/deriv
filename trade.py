@@ -15,7 +15,7 @@ def btn(name, key=secrets.token_urlsafe()):
 async def background():
     while True:
         print('background task run')
-        await asyncio.sleep(0)
+        await asyncio.sleep(60)
 
 
 async def ui():
@@ -62,17 +62,18 @@ async def ui():
     #player = list_player.get_media_player()
 
     trade_session = TradeSession()
+    await trade_session.setup(window)
 
-    while True:  # Event Loop
+    while True:  # PysimpleGUI Event Loop
         event, values = window.read()
 
         if event == sg.WIN_CLOSED or event == 'Exit':
-            trade_session.exit()
+            await trade_session.exit()
             break
 
         if event == '_LOGIN_':
             if values['_EMAIL_'] and values['_PWORD_']:
-                trade_session.login(values['_EMAIL_'], values['_PWORD_'])
+                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
             else:
                 window['_MESSAGE_'].update(
                         'Please provide Email and Password'
@@ -88,15 +89,16 @@ async def ui():
         if event == '_BUTTON_STOP_':
             trade_session.stop()
 
+        await asyncio.sleep(0)
     window.close()
 
 
 
 async def main():
     await asyncio.wait(
-            [background(), ui()]
+            [ui()]
         )
 
 
 if __name__ == '__main__':
-    await main()
+    asyncio.run(ui())

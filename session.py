@@ -1,4 +1,7 @@
-from playwright.sync_api import Playwright, sync_playwright
+#from playwright.sync_api import Playwright, sync_playwright
+import os
+import asyncio
+from playwright.async_api import async_playwright
 from prob import check_stop
 
 
@@ -10,42 +13,73 @@ class TradeSession:
         self.stop_profit = 2
         self.loop = False
 
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=False)
-        self.page = self.browser.new_page()
+
+    async def setup(self, window):
+        '''
+        This was supposed to go to init method
+        but a quick way to avoid awaiting on the initializer
+        '''
+
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=False)
+
+        state = "state.json"
+        if os.path.isfile(state):
+            # Create a new context with the saved storage state.
+            self.context = await self.browser.new_context(storage_state=state)
+            window['_MESSAGE_'].update('Logged in already from the previous session!')
+            self.page = await self.context.new_page()
+            await self.page.goto("https://smarttrader.deriv.com/")
+        else:
+            self.context = await self.browser.new_context()
+            self.page = await self.context.new_page()
 
 
-    def login(self, email, psword):
+    async def login(self, email, psword):
+        '''
+        Login if not logged in and then store the context into state.json
+        '''
+
+        #Best way to go about this is to check if state.json exists in path
+        #if yes then return here, and notify the user via message key
+
         # Go to https://smarttrader.deriv.com/
-        self.page.goto("https://smarttrader.deriv.com/")
+        await self.page.goto("https://smarttrader.deriv.com/")
 
         # Click text=Log in
         lg_btn = self.page.locator("#btn__login") or self.page.locator("text=Log in")
-        lg_btn.click()
+        await lg_btn.click()
 
-        self.page.wait_for_timeout(9000)
+        await asyncio.sleep(7)
+        #self.page.wait_for_timeout(9000)
 
         # Click [placeholder="example\@email\.com"]
         email_input = self.page.locator('#txtEmail') or self.page.locator("[placeholder=\"example\\@email\\.com\"]")
-        email_input.fill(email)
+        await email_input.fill(email)
 
-        self.page.wait_for_timeout(3000)
+        await asyncio.sleep(3)
+        #self.page.wait_for_timeout(3000)
 
         psword_input = self.page.locator('#txtPass') or self.page.locator("input[name=\"password\"]")
 
         # Fill input[name="password"]
-        psword_input.fill(psword)
+        await psword_input.fill(psword)
 
-        self.page.wait_for_timeout(2000)
+        await asyncio.sleep(3)
+        #self.page.wait_for_timeout(2000)
         # Click button:has-text("Log in")
         # with page.expect_navigation(url="https://smarttrader.deriv.com/en/trading.html"):
-        with self.page.expect_navigation():
+        async with self.page.expect_navigation():
             submit_btn = self.page.locator('button.button.secondary') or self.page.locator('input[name="login"]')
-            submit_btn.click()
+            await submit_btn.click()
             #page.locator("button:has-text(\"Log in\")").click()
 
+        await asyncio.sleep(3)
+        # Save storage state into the file.
+        storage = await self.context.storage_state(path="state.json")
 
-    def play(self, window, values):
+
+    async def play(self, window, values):
         '''
         Runs the smarttrader session with Volatility 100
         in the Match/Differ settings
@@ -61,23 +95,28 @@ class TradeSession:
         ldp = int(values['_LDP_'])
         self.init_stake = stake
 
-        start_balance = self.page.locator("#header__acc-balance").inner_text().split()[0]
+        sblnc = await self.page.locator("#header__acc-balance").inner_text()
+        start_balance = sblnc.split()[0]
         #window['_START_BAL_'].update(start_balance)
         #window['_STOP_EST_'].update('0.00')
 
         self.loop = True
         while self.loop:
-            self.page.goto(
+            await self.page.goto(
                 f"https://smarttrader.deriv.com/en/trading.html?currency=USD&market=synthetic_index&underlying=R_100&formname=matchdiff&date_start=now&duration_amount=1&duration_units=t&amount={stake}&amount_type=stake&expiry_type=duration&prediction={ldp}"
             )
-            self.page.wait_for_timeout(13000)
+
+            await asyncio.sleep(5)
+            #self.page.wait_for_timeout(13000)
 
             # Click #purchase_button_top
-            self.page.locator("#purchase_button_top").click()
+            await self.page.locator("#purchase_button_top").click()
 
-            self.page.wait_for_timeout(5000)
+            #self.page.wait_for_timeout(5000)
             # Click text=This contract lost
-            result_str = self.page.locator("#contract_purchase_heading").inner_text()
+            await self.page.locator("#contract_purchase_heading").wait_for()
+
+            result_str = await self.page.locator("#contract_purchase_heading").inner_text()
 
             win = False
             if result_str == "This contract won":
@@ -85,13 +124,15 @@ class TradeSession:
             elif result_str == "This contract lost":
                 win = False
 
+            await self.page.locator("#close_confirmation_container").wait_for()
 
-            self.page.wait_for_timeout(7000)
+            #self.page.wait_for_timeout(7000)
             # Click #close_confirmation_container
-            self.page.locator("#close_confirmation_container").click()
+            await self.page.locator("#close_confirmation_container").click()
 
-            martingale, stop_est = check_stop(self, start_balance, stake)
-            balance = self.page.locator("#header__acc-balance").inner_text().split()[0]
+            martingale, stop_est = await check_stop(self, start_balance, stake)
+            balance = await self.page.locator("#header__acc-balance").inner_text()
+            balance = balance.split()[0]
             #window['_CURRENT_BAL_'].update(balance)
             #window['_STOP_EST_'].update(round(stop_est, 2))
 
@@ -104,6 +145,8 @@ class TradeSession:
             else:
                 stake = round(float(stake)+martingale, 2)
 
+            await asyncio.sleep(0)
+
 
     def pause(self):
         self.loop = False
@@ -113,12 +156,12 @@ class TradeSession:
         self.loop = False
 
 
-    def exit(self):
+    async def exit(self):
         '''
         Executed when the user closes (X)
         the GUI application window
         '''
 
-        self.browser.close()
-        self.playwright.stop()
+        await self.browser.close()
+        await self.playwright.stop()
         return

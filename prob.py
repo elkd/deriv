@@ -1,4 +1,7 @@
-def check_stop(session, start_balance, stake):
+import asyncio
+
+
+async def check_stop(session, start_balance, stake):
     ''' Compute new stake value
     #Martingale should round off to 2 Decimal points {Formulae= (Stake*Martingale) + Stake
 	#Stop Loss= When total losses of stakes add up to the value or more
@@ -7,9 +10,10 @@ def check_stop(session, start_balance, stake):
 
     stake = float(stake)
 
-    cur_balance = session.page.locator(
+    bl = await session.page.locator(
             "#header__acc-balance"
-        ).inner_text().split()[0].replace(',','')
+        ).inner_text()
+    cur_balance = bl.split()[0].replace(',','')
 
     stop_est = float(cur_balance) - float(start_balance.replace(',',''))
 
