@@ -22,7 +22,7 @@ async def bg(window, trade_session):
     await trade_session.setup(window)
     while True:
         await asyncio.sleep(0)
-        event, values = window.read(timeout=30)
+        event, values = window.read(timeout=10)
 
         if event == sg.WIN_CLOSED or event == 'Exit':
             await trade_session.exit()
@@ -31,7 +31,7 @@ async def bg(window, trade_session):
 
         if event == '_LOGIN_':
             if values['_EMAIL_'] and values['_PWORD_']:
-                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
+                await trade_session.login(values['_EMAIL_'], values['_PWORD_'], window)
             else:
                 window['_MESSAGE_'].update(
                         'Please provide Email and Password'
@@ -52,7 +52,7 @@ async def ui(window, trade_session):
     '''
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
-        event, values = window.read(timeout=30)
+        event, values = window.read(timeout=10)
 
         if event == sg.WIN_CLOSED or event == 'Exit':
             await trade_session.exit()
@@ -132,5 +132,5 @@ if __name__ == '__main__':
     try:
         asyncio.run(main(window, trade_session))
     except Exception as e:
-        #print(traceback.format_exc())
+        print(traceback.format_exc())
         print('The program has been halted!')

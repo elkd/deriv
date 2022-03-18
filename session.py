@@ -53,7 +53,7 @@ class TradeSession:
         await self.page.goto("https://smarttrader.deriv.com/")
 
 
-    async def login(self, email, psword):
+    async def login(self, email, psword, window):
         '''
         Login if not logged in and then store the context into state.json
 
