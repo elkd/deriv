@@ -1,8 +1,8 @@
 import asyncio
 import secrets
+import traceback
 import PySimpleGUI as sg
 from session import TradeSession
-
 
 
 
@@ -23,6 +23,10 @@ async def bg(window, trade_session):
     while True:
         await asyncio.sleep(0)
         event, values = window.read(timeout=30)
+
+        if event == sg.WIN_CLOSED or event == 'Exit':
+            await trade_session.exit()
+            break
 
         if event == '_LOGIN_':
             if values['_EMAIL_'] and values['_PWORD_']:
@@ -70,15 +74,17 @@ async def ui(window, trade_session):
 
 
 async def main(window, trade_session):
+    '''
+    Async Functions Main entry
+
+    '''
     try:
         #can be asyncio.wait([ui(), bg()] without return value
         res = await asyncio.gather(
                 ui(window, trade_session), bg(window, trade_session)
             )
-        print(res)
     except Exception as e:
         raise e
-    print(res)
 
 
 if __name__ == '__main__':
@@ -107,7 +113,8 @@ if __name__ == '__main__':
 
         [sg.Text(size=(15,2))], #This is just for margin top bottom
 
-        [btn('Play ▶️', '_BUTTON_PLAY_'), btn('Pause ⏸️', '_BUTTON_PAUSE_'), btn('Stop ⏹️', '_BUTTON_STOP_')],
+        [btn('Play ▶️', '_BUTTON_PLAY_'),
+            btn('Pause ⏸️', '_BUTTON_PAUSE_'), btn('Stop ⏹️', '_BUTTON_STOP_')],
 
     ]
 
@@ -121,9 +128,9 @@ if __name__ == '__main__':
 
     #Use it in different coros in the async loop
     trade_session = TradeSession()
-    print(trade_session.loop)
 
     try:
         asyncio.run(main(window, trade_session))
     except Exception as e:
         print(e)
+        print(traceback.format_exc())
