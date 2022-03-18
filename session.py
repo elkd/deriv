@@ -113,6 +113,7 @@ class TradeSession:
             await self.page.locator("#purchase_button_top").click()
 
             #self.page.wait_for_timeout(5000)
+            await asyncio.sleep(5)
             # Click text=This contract lost
             await self.page.locator("#contract_purchase_heading").wait_for()
 

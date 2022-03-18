@@ -1,3 +1,4 @@
+import threading  # New statement
 import asyncio
 import secrets
 import PySimpleGUI as sg
@@ -62,6 +63,8 @@ async def ui():
     #player = list_player.get_media_player()
 
     trade_session = TradeSession()
+
+    #This code blocks the UI yet
     await trade_session.setup(window)
 
     while True:  # PysimpleGUI Event Loop
@@ -73,16 +76,36 @@ async def ui():
 
         if event == '_LOGIN_':
             if values['_EMAIL_'] and values['_PWORD_']:
-                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
+                _thread = threading.Thread(
+                        target=asyncio.run_coroutine_threadsafe,
+                        args=(
+                            trade_session.login(values['_EMAIL_'],values['_PWORD_']),
+                            asyncio.get_running_loop()
+                         )
+                    )
+                _thread.start()
+                await asyncio.sleep(0)
+
             else:
                 window['_MESSAGE_'].update(
                         'Please provide Email and Password'
                     )
 
         if event == '_BUTTON_PLAY_':
-            await trade_session.play(
-                    window, values
+            # This throws TypeError: A coroutine object is required when used with await trade_session.play()
+            #Without the await, I haven't tested it yet
+            # Also the thread only runs the coroutine after the function play() has already run
+            _thread = threading.Thread(
+                    target=asyncio.run_coroutine_threadsafe,
+                    args=(
+                        trade_session.play(window, values),
+                        asyncio.get_running_loop()
+                     )
                 )
+            #_thread = threading.Thread(target=asyncio.run, args=())
+            _thread.start()
+            await asyncio.sleep(0)
+
         if event == '_BUTTON_PAUSE_':
             trade_session.pause()
 
