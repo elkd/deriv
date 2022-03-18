@@ -4,6 +4,13 @@ import PySimpleGUI as sg
 from session import TradeSession
 
 
+
+#Use it in different coros in the async loop
+window = None
+trade_session = TradeSession()
+print(trade_session.loop)
+
+
 def btn(name, key=secrets.token_urlsafe()):
     '''
     # a PySimpleGUI "User Defined Element" (see PySimpleGUI docs)
@@ -13,12 +20,71 @@ def btn(name, key=secrets.token_urlsafe()):
 
 
 async def background():
+    '''
+    Run all blocking tasks here
+    '''
+
+    await trade_session.setup(window)
     while True:
+        event, values = window.read()
+
+        if event == '_LOGIN_':
+            if values['_EMAIL_'] and values['_PWORD_']:
+                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
+            else:
+                window['_MESSAGE_'].update(
+                        'Please provide Email and Password'
+                    )
+
+        if event == '_BUTTON_PLAY_':
+            await trade_session.play(
+                    window, values
+                )
+
         print('background task run')
-        await asyncio.sleep(60)
+        await asyncio.sleep(0)
 
 
 async def ui():
+    '''
+    Run all non-blocking, main GUI tasks here
+
+    '''
+    #list_player = inst.media_list_player_new()
+    #media_list = inst.media_list_new([])
+    #list_player.set_media_list(media_list)
+    #player = list_player.get_media_player()
+
+    while True:  # PysimpleGUI Event Loop
+        event, values = window.read()
+
+        if event == sg.WIN_CLOSED or event == 'Exit':
+            await trade_session.exit()
+            break
+
+        if event == '_BUTTON_PAUSE_':
+            trade_session.pause()
+
+        if event == '_BUTTON_STOP_':
+            trade_session.stop()
+
+        await asyncio.sleep(0)
+    window.close()
+
+
+
+async def main():
+    try:
+        #can be asyncio.wait([ui(), bg()] without return value
+        res = await asyncio.gather(
+                ui(), background()
+            )
+    except Exception as e:
+        raise e
+    print(res)
+
+
+if __name__ == '__main__':
     sg.theme('BluePurple')
 
     layout = [
@@ -55,50 +121,7 @@ async def ui():
                 element_justification='center',
                 finalize=True, resizable=True
             )
-
-    #list_player = inst.media_list_player_new()
-    #media_list = inst.media_list_new([])
-    #list_player.set_media_list(media_list)
-    #player = list_player.get_media_player()
-
-    trade_session = TradeSession()
-    await trade_session.setup(window)
-
-    while True:  # PysimpleGUI Event Loop
-        event, values = window.read()
-
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            await trade_session.exit()
-            break
-
-        if event == '_LOGIN_':
-            if values['_EMAIL_'] and values['_PWORD_']:
-                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
-            else:
-                window['_MESSAGE_'].update(
-                        'Please provide Email and Password'
-                    )
-
-        if event == '_BUTTON_PLAY_':
-            await trade_session.play(
-                    window, values
-                )
-        if event == '_BUTTON_PAUSE_':
-            trade_session.pause()
-
-        if event == '_BUTTON_STOP_':
-            trade_session.stop()
-
-        await asyncio.sleep(0)
-    window.close()
-
-
-
-async def main():
-    await asyncio.wait(
-            [ui()]
-        )
-
-
-if __name__ == '__main__':
-    asyncio.run(ui())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(e)

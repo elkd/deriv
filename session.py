@@ -13,6 +13,11 @@ class TradeSession:
         self.stop_profit = 2
         self.loop = False
 
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+
 
     async def setup(self, window):
         '''
@@ -162,6 +167,7 @@ class TradeSession:
         the GUI application window
         '''
 
-        await self.browser.close()
-        await self.playwright.stop()
+        if self.browser and self.playwright:
+            await self.browser.close()
+            await self.playwright.stop()
         return
