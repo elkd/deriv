@@ -1,6 +1,9 @@
+import asyncio
 import secrets
+import traceback
 import PySimpleGUI as sg
 from session import TradeSession
+
 
 
 def btn(name, key=secrets.token_urlsafe()):
@@ -10,11 +13,82 @@ def btn(name, key=secrets.token_urlsafe()):
     return sg.Button(name, key=key, size=(8, 1), pad=(2, 2))
 
 
+
+async def bg(window, trade_session):
+    '''
+    Run all blocking tasks here
+    '''
+
+    await trade_session.setup(window)
+    while True:
+        await asyncio.sleep(0)
+        event, values = window.read(timeout=30)
+
+        if event == sg.WIN_CLOSED or event == 'Exit':
+            await trade_session.exit()
+            asyncio.get_running_loop().stop()
+            break
+
+        if event == '_LOGIN_':
+            if values['_EMAIL_'] and values['_PWORD_']:
+                await trade_session.login(values['_EMAIL_'], values['_PWORD_'])
+            else:
+                window['_MESSAGE_'].update(
+                        'Please provide Email and Password'
+                    )
+
+        if event == '_BUTTON_PLAY_':
+            await trade_session.play(
+                    window, values
+                )
+
+        await asyncio.sleep(0)
+
+
+async def ui(window, trade_session):
+    '''
+    Run all non-blocking, main GUI tasks here
+
+    '''
+    while True:  # PysimpleGUI Event Loop
+        await asyncio.sleep(0)
+        event, values = window.read(timeout=30)
+
+        if event == sg.WIN_CLOSED or event == 'Exit':
+            await trade_session.exit()
+            asyncio.get_running_loop().stop()
+            break
+
+        if event == '_BUTTON_PAUSE_':
+            trade_session.pause(window)
+
+        if event == '_BUTTON_STOP_':
+            trade_session.stop(window)
+
+        await asyncio.sleep(0)
+    window.close()
+
+
+
+async def main(window, trade_session):
+    '''
+    Async Functions Main entry
+
+    '''
+    try:
+        #can be asyncio.wait([ui(), bg()] without return value
+        res = await asyncio.gather(
+                ui(window, trade_session), bg(window, trade_session)
+            )
+    except Exception as e:
+        raise e
+
+
 if __name__ == '__main__':
     sg.theme('BluePurple')
 
     layout = [
-        [sg.Text(size=(15,1), key='_MESSAGE_')],
+        [sg.Text(size=(30,1), key='_MESSAGE_')],
 
         [sg.Text('Email'), sg.Input(size=(24,1), k='_EMAIL_'),
             sg.Text(size=(7,1)), sg.Text('Password'), sg.Input(size=(24,1), k='_PWORD_')],
@@ -36,7 +110,11 @@ if __name__ == '__main__':
 
         [sg.Text(size=(15,2))], #This is just for margin top bottom
 
-        [btn('Play ▶️', '_BUTTON_PLAY_'), btn('Pause ⏸️', '_BUTTON_PAUSE_'), btn('Stop ⏹️', '_BUTTON_STOP_')],
+
+        [sg.Text('STATUS: '), sg.Text('NOT PLAYING!', size=(20,1), key='_PLAY_STATUS_')],
+
+        [btn('Play ▶️', '_BUTTON_PLAY_'),
+            btn('Pause ⏸️', '_BUTTON_PAUSE_'), btn('Stop ⏹️', '_BUTTON_STOP_')],
 
     ]
 
@@ -48,36 +126,10 @@ if __name__ == '__main__':
                 finalize=True, resizable=True
             )
 
-    #list_player = inst.media_list_player_new()
-    #media_list = inst.media_list_new([])
-    #list_player.set_media_list(media_list)
-    #player = list_player.get_media_player()
-
+    #Use it in different coros in the async loop
     trade_session = TradeSession()
 
-    while True:  # Event Loop
-        event, values = window.read()
-
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            trade_session.exit()
-            break
-
-        if event == '_LOGIN_':
-            if values['_EMAIL_'] and values['_PWORD_']:
-                trade_session.login(values['_EMAIL_'], values['_PWORD_'])
-            else:
-                window['_MESSAGE_'].update(
-                        'Please provide Email and Password'
-                    )
-
-        if event == '_BUTTON_PLAY_':
-            trade_session.play(
-                    window, values
-                )
-        if event == '_BUTTON_PAUSE_':
-            trade_session.pause()
-
-        if event == '_BUTTON_STOP_':
-            trade_session.stop()
-
-    window.close()
+    try:
+        asyncio.run(main(window, trade_session))
+    except Exception as e:
+        print('The program has been halted!')
