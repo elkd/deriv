@@ -70,16 +70,9 @@ media/
 staticfiles/
 prod-staticfiles/
 .idea
-
+state.json
 CODEOWNERS
 
-frontend/node_modules/
-
-obrisk/templates/serviceworker.js
-
-obrisk/static/frontend/
-
-node_modules/
 
 certs/
 
@@ -91,6 +84,5 @@ celerybeat*
 
 *.sw*
 
-# Aliyun CLI 
 aliyun/
 search.txt
