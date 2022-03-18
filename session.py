@@ -29,6 +29,8 @@ class TradeSession:
         self.browser = await self.playwright.chromium.launch(headless=False)
 
         state = "state.json"
+
+        await asyncio.sleep(0)
         if os.path.isfile(state):
             # Create a new context with the saved storage state.
             self.context = await self.browser.new_context(storage_state=state)

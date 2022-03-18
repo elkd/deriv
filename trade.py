@@ -5,11 +5,6 @@ from session import TradeSession
 
 
 
-#Use it in different coros in the async loop
-window = None
-trade_session = TradeSession()
-print(trade_session.loop)
-
 
 def btn(name, key=secrets.token_urlsafe()):
     '''
@@ -19,14 +14,15 @@ def btn(name, key=secrets.token_urlsafe()):
 
 
 
-async def background():
+async def bg(window, trade_session):
     '''
     Run all blocking tasks here
     '''
 
     await trade_session.setup(window)
     while True:
-        event, values = window.read()
+        await asyncio.sleep(0)
+        event, values = window.read(timeout=30)
 
         if event == '_LOGIN_':
             if values['_EMAIL_'] and values['_PWORD_']:
@@ -41,11 +37,10 @@ async def background():
                     window, values
                 )
 
-        print('background task run')
         await asyncio.sleep(0)
 
 
-async def ui():
+async def ui(window, trade_session):
     '''
     Run all non-blocking, main GUI tasks here
 
@@ -56,7 +51,8 @@ async def ui():
     #player = list_player.get_media_player()
 
     while True:  # PysimpleGUI Event Loop
-        event, values = window.read()
+        await asyncio.sleep(0)
+        event, values = window.read(timeout=30)
 
         if event == sg.WIN_CLOSED or event == 'Exit':
             await trade_session.exit()
@@ -73,12 +69,13 @@ async def ui():
 
 
 
-async def main():
+async def main(window, trade_session):
     try:
         #can be asyncio.wait([ui(), bg()] without return value
         res = await asyncio.gather(
-                ui(), background()
+                ui(window, trade_session), bg(window, trade_session)
             )
+        print(res)
     except Exception as e:
         raise e
     print(res)
@@ -121,7 +118,12 @@ if __name__ == '__main__':
                 element_justification='center',
                 finalize=True, resizable=True
             )
+
+    #Use it in different coros in the async loop
+    trade_session = TradeSession()
+    print(trade_session.loop)
+
     try:
-        asyncio.run(main())
+        asyncio.run(main(window, trade_session))
     except Exception as e:
         print(e)
