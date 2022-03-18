@@ -26,6 +26,7 @@ async def bg(window, trade_session):
 
         if event == sg.WIN_CLOSED or event == 'Exit':
             await trade_session.exit()
+            asyncio.get_running_loop().stop()
             break
 
         if event == '_LOGIN_':
@@ -49,24 +50,20 @@ async def ui(window, trade_session):
     Run all non-blocking, main GUI tasks here
 
     '''
-    #list_player = inst.media_list_player_new()
-    #media_list = inst.media_list_new([])
-    #list_player.set_media_list(media_list)
-    #player = list_player.get_media_player()
-
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
         event, values = window.read(timeout=30)
 
         if event == sg.WIN_CLOSED or event == 'Exit':
             await trade_session.exit()
+            asyncio.get_running_loop().stop()
             break
 
         if event == '_BUTTON_PAUSE_':
-            trade_session.pause()
+            trade_session.pause(window)
 
         if event == '_BUTTON_STOP_':
-            trade_session.stop()
+            trade_session.stop(window)
 
         await asyncio.sleep(0)
     window.close()
@@ -91,7 +88,7 @@ if __name__ == '__main__':
     sg.theme('BluePurple')
 
     layout = [
-        [sg.Text(size=(15,1), key='_MESSAGE_')],
+        [sg.Text(size=(30,1), key='_MESSAGE_')],
 
         [sg.Text('Email'), sg.Input(size=(24,1), k='_EMAIL_'),
             sg.Text(size=(7,1)), sg.Text('Password'), sg.Input(size=(24,1), k='_PWORD_')],
@@ -113,6 +110,9 @@ if __name__ == '__main__':
 
         [sg.Text(size=(15,2))], #This is just for margin top bottom
 
+
+        [sg.Text('STATUS: '), sg.Text('NOT PLAYING!', size=(20,1), key='_PLAY_STATUS_')],
+
         [btn('Play ▶️', '_BUTTON_PLAY_'),
             btn('Pause ⏸️', '_BUTTON_PAUSE_'), btn('Stop ⏹️', '_BUTTON_STOP_')],
 
@@ -132,5 +132,4 @@ if __name__ == '__main__':
     try:
         asyncio.run(main(window, trade_session))
     except Exception as e:
-        print(e)
-        print(traceback.format_exc())
+        print('The program has been halted!')
