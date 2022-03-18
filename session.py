@@ -60,7 +60,7 @@ class TradeSession:
         '''
         #Best way to go about this is to check if state.json exists in path
         #if yes then return here, and notify the user via message key
-        if os.path.isfile(state):
+        if os.path.isfile("state.json"):
             window['_MESSAGE_'].update('Logged in already!')
             return
 
@@ -93,6 +93,7 @@ class TradeSession:
             await submit_btn.click()
             #page.locator("button:has-text(\"Log in\")").click()
 
+        window['_MESSAGE_'].update('Logged in already!')
         await asyncio.sleep(3)
         # Save storage state into the file.
         storage = await self.context.storage_state(path="state.json")
