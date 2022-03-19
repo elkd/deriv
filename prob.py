@@ -20,4 +20,4 @@ async def check_stop(session, start_balance, stake):
     if stop_est > float(session.stop_profit) or abs(stop_est) > float(session.stop_loss):
         return None, stop_est
 
-    return (stake*float(session.mtng)) + stake, stop_est
+    return stake*float(session.mtng), stop_est

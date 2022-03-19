@@ -5,7 +5,6 @@ import PySimpleGUI as sg
 from session import TradeSession
 
 
-
 def btn(name, key=secrets.token_urlsafe()):
     '''
     # a PySimpleGUI "User Defined Element" (see PySimpleGUI docs)
@@ -64,6 +63,17 @@ async def ui(window, trade_session):
 
         if event == '_BUTTON_STOP_':
             trade_session.stop(window)
+
+        if trade_session.loop:
+            bl = await trade_session.page.locator("#header__acc-balance").inner_text()
+            if bl:
+                cur_balance = float(bl.split()[0].replace(',',''))
+
+                stop_est = cur_balance - trade_session.start_balance
+
+                if stop_est > float(trade_session.stop_profit) or abs(stop_est) > float(trade_session.stop_loss):
+                    trade_session.loop = False
+                    window['_PLAY_STATUS_'].update('AUTO STOPPED!')
 
         await asyncio.sleep(0)
     window.close()
@@ -132,5 +142,5 @@ if __name__ == '__main__':
     try:
         asyncio.run(main(window, trade_session))
     except Exception as e:
-        print(traceback.format_exc())
+        #print(traceback.format_exc())
         print('The program has been halted!')
