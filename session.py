@@ -146,8 +146,10 @@ class TradeSession:
                 await asyncio.sleep(1.75)
 
                 next_price = await spot_balance_span.inner_text()
+
                 if int(next_price[-1]) is bid_ldp:
                     self.stake = self.init_stake
+                    await asyncio.sleep(1.75)
                 else:
                     self.stake = round(self.stake * self.mtng + self.stake, 2)
 
