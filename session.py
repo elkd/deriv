@@ -47,7 +47,6 @@ class TradeSession:
             self.context = await self.browser.new_context(storage_state=state)
             window['_MESSAGE_'].update('Logged in already!')
             self.page = await self.context.new_page()
-            await self.page.goto("https://smarttrader.deriv.com/")
         else:
             window['_MESSAGE_'].update('Please Login First!')
             self.context = await self.browser.new_context()
@@ -146,6 +145,10 @@ class TradeSession:
                 await asyncio.sleep(1.75)
 
                 next_price = await spot_balance_span.inner_text()
+                #If the price spot didn't change yet
+                #try again to read the next_price
+                while next_price == bid_spot:
+                    next_price = await spot_balance_span.inner_text()
 
                 if int(next_price[-1]) is bid_ldp:
                     self.stake = self.init_stake
