@@ -126,13 +126,16 @@ class TradeSession:
         }""")
         '''
 
-        bid_ldp = 10 #This will be false in the play check if span.innerText was ''
+        #The initial bid_ldp will be false in the play check if span.innerText was ''
+        bid_ldp = prev_spot = None
         self.loop = True
-        prev_spot = await spot_balance_span.inner_text()
 
         while self.loop:
             bid_spot = await spot_balance_span.inner_text()
             if bid_spot:
+                while prev_spot == bid_spot:
+                    bid_spot = await spot_balance_span.inner_text()
+
                 bid_ldp = int(bid_spot[-1])
 
             if bid_ldp is self.ldp: #Play Check
@@ -149,13 +152,14 @@ class TradeSession:
                 #try again to read the next_price
                 while next_price == bid_spot:
                     next_price = await spot_balance_span.inner_text()
+                prev_spot = next_price
 
                 if int(next_price[-1]) is bid_ldp:
                     self.stake = self.init_stake
-                    await asyncio.sleep(1.75)
                 else:
                     self.stake = round(self.stake * self.mtng + self.stake, 2)
 
+                await asyncio.sleep(1.75)
                 await stake_input.fill(str(self.stake))
 
                 pbtn_visible = await purchase_handle.is_visible()
@@ -165,9 +169,9 @@ class TradeSession:
             else:
                 #Wait for the tick spot price to change first
                 #Before moving to the next loop round
+                prev_spot = bid_spot
                 await asyncio.sleep(1.77)
 
-            prev_spot = bid_spot
             await asyncio.sleep(0)
 
 
