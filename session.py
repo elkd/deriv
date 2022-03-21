@@ -1,4 +1,3 @@
-#from playwright.sync_api import Playwright, sync_playwright
 import os
 import asyncio
 import traceback
@@ -25,7 +24,7 @@ class TradeSession:
     async def setup(self, window):
         '''
         This was supposed to go to init method
-        but a quick way to avoid awaiting on the initializer
+        but a quick way to avoid a return on the init
         '''
 
         window['_MG_'].update(self.mtng)
@@ -40,8 +39,8 @@ class TradeSession:
         self.browser = await self.playwright.chromium.launch(headless=False)
 
         state = "state.json"
-
         await asyncio.sleep(0)
+
         if os.path.isfile(state):
             # Create a new context with the saved storage state.
             self.context = await self.browser.new_context(storage_state=state)
@@ -177,11 +176,13 @@ class TradeSession:
 
     async def play(self, window, values):
         '''
-        Runs the smarttrader session with Volatility 100
-        in the Match/Differ settings
+        Runs the smarttrader session with Volatility 100,
+        Match/Differ option and Tick = 1
         '''
         if not values['_SK_'] or not values['_MG_'] or not values['_LDP_']:
-            window['_MESSAGE_'].update('Please provide LDP, Stake and initial Martingale')
+            window['_MESSAGE_'].update(
+                    'Please provide LDP, Stake and initial Martingale'
+                )
             return
 
         if self.paused:
@@ -200,7 +201,6 @@ class TradeSession:
         stake_input = self.page.locator("#amount")
 
         #The use of handle is discouraged. But useful to check if element is_visible()
-
         purchase_handle = await self.page.wait_for_selector('#purchase_button_top')
 
         sblnc = await self.page.locator("#header__acc-balance").inner_text()
