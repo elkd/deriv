@@ -44,7 +44,6 @@ class TradeSession:
         if os.path.isfile(state):
             # Create a new context with the saved storage state.
             self.context = await self.browser.new_context(storage_state=state)
-            window['_MESSAGE_'].update('Logged in already!')
             self.page = await self.context.new_page()
         else:
             window['_MESSAGE_'].update('Please Login First!')
@@ -145,7 +144,7 @@ class TradeSession:
 
                 #Sleep will facilitate Waiting for the price to change
                 #Then we can move on to check if we won or fail
-                await asyncio.sleep(1.75)
+                await asyncio.sleep(1.7)
 
                 next_price = await spot_balance_span.inner_text()
                 #If the price spot didn't change yet
@@ -166,14 +165,14 @@ class TradeSession:
                 print(bid_spot, next_price, next_price[-1])
 
                 if int(next_price[-1]) is bid_ldp:
-                    print('Won')
+                    print('--WON--')
                     self.stake = self.init_stake
                 else:
-                    print('Lost')
+                    print('LOST!!!')
                     self.stake = round(self.stake * self.mtng + self.stake, 2)
 
                 print(f'The stake is updated to: {self.stake}')
-                await asyncio.sleep(1.75)
+                await asyncio.sleep(1.7)
                 await stake_input.fill(str(self.stake))
 
                 pbtn_visible = await purchase_handle.is_visible()
@@ -181,14 +180,16 @@ class TradeSession:
                     try:
                         await self.page.locator("#close_confirmation_container").click()
                     except PWTimeoutError as e:
-                        return 'BK'
+                        print('Purchase button is disabled by Deriv, waiting for activation to play...')
+                        await asyncio.sleep(8)
+                        return await self.tight_play(spot_balance_span, stake_input, purchase_handle)
 
                 prev_spot = next_price
             else:
                 #Wait for the tick spot price to change first
                 #Before moving to the next loop round
                 prev_spot = bid_spot
-                await asyncio.sleep(1.77)
+                await asyncio.sleep(1.7)
 
             #prev_spot = bid_spot
             await asyncio.sleep(0)
