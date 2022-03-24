@@ -66,9 +66,10 @@ class TradeSession:
         '''
         #Best way to go about this is to check if state.json exists in path
         #if yes then return here, and notify the user via message key
-        if os.path.isfile("state.json"):
-            window['_MESSAGE_'].update('Logged in already!')
-            return
+
+        #if os.path.isfile("state.json"): #This doesn't guarantee logged in
+            #window['_MESSAGE_'].update('Logged in already!')
+            #return
 
         # Click text=Log in
         try:
@@ -151,26 +152,45 @@ class TradeSession:
                 #try again to read the next_price
                 while next_price == bid_spot:
                     next_price = await spot_balance_span.inner_text()
-                prev_spot = next_price
+
+                bl = await self.page.locator("#header__acc-balance").inner_text()
+                if bl:
+                    cur_balance = float(bl.split()[0].replace(',',''))
+
+                    stop_est = cur_balance - self.start_balance
+
+                    if stop_est > float(self.stop_profit) or abs(stop_est) > float(self.stop_loss):
+                        self.loop = False
+                        return 'AS'
+
+                print(bid_spot, next_price, next_price[-1])
 
                 if int(next_price[-1]) is bid_ldp:
+                    print('Won')
                     self.stake = self.init_stake
                 else:
+                    print('Lost')
                     self.stake = round(self.stake * self.mtng + self.stake, 2)
 
+                print(f'The stake is updated to: {self.stake}')
                 await asyncio.sleep(1.75)
                 await stake_input.fill(str(self.stake))
 
                 pbtn_visible = await purchase_handle.is_visible()
                 if not pbtn_visible:
-                    await self.page.locator("#close_confirmation_container").click()
+                    try:
+                        await self.page.locator("#close_confirmation_container").click()
+                    except PWTimeoutError as e:
+                        return 'BK'
 
+                prev_spot = next_price
             else:
                 #Wait for the tick spot price to change first
                 #Before moving to the next loop round
                 prev_spot = bid_spot
                 await asyncio.sleep(1.77)
 
+            #prev_spot = bid_spot
             await asyncio.sleep(0)
 
 
@@ -220,7 +240,12 @@ class TradeSession:
             await asyncio.sleep(8)
 
         await asyncio.sleep(4)
-        await self.tight_play(spot_balance_span, stake_input, purchase_handle)
+        status = await self.tight_play(spot_balance_span, stake_input, purchase_handle)
+        if status == 'AS':
+            window['_PLAY_STATUS_'].update('AUTO STOPPED!')
+        elif status == 'BK':
+            window['_PLAY_STATUS_'].update('PURCHASE BLOCKED!')
+
 
 
     def pause(self, window):

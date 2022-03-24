@@ -12,6 +12,36 @@ def btn(name, key=secrets.token_urlsafe()):
     return sg.Button(name, key=key, size=(8, 1), pad=(2, 2))
 
 
+async def event_listeners(event, values, window, trade_session):
+    '''
+    Both bg and ui tasks should be listening on all click events
+    So that there is no visible delay to the user on any click event
+    '''
+    if event == sg.WIN_CLOSED or event == 'Exit':
+        await trade_session.exit()
+        asyncio.get_running_loop().stop()
+        return 'BR'
+
+    if event == '_LOGIN_':
+        if values['_EMAIL_'] and values['_PWORD_']:
+            await trade_session.login(values['_EMAIL_'], values['_PWORD_'], window)
+        else:
+            window['_MESSAGE_'].update(
+                    'Please provide Email and Password'
+                )
+
+    if event == '_BUTTON_PLAY_':
+        await trade_session.play(
+                window, values
+            )
+
+    if event == '_BUTTON_PAUSE_':
+        trade_session.pause(window)
+
+    if event == '_BUTTON_STOP_':
+        trade_session.stop(window)
+
+
 
 async def bg(window, trade_session):
     '''
@@ -19,29 +49,17 @@ async def bg(window, trade_session):
     '''
 
     await trade_session.setup(window)
+
     while True:
         await asyncio.sleep(0)
-        event, values = window.read(timeout=10)
+        event, values = window.read(timeout=5)
 
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            await trade_session.exit()
-            asyncio.get_running_loop().stop()
+        action = await event_listeners(event, values, window, trade_session)
+        if action == 'BR':
             break
 
-        if event == '_LOGIN_':
-            if values['_EMAIL_'] and values['_PWORD_']:
-                await trade_session.login(values['_EMAIL_'], values['_PWORD_'], window)
-            else:
-                window['_MESSAGE_'].update(
-                        'Please provide Email and Password'
-                    )
-
-        if event == '_BUTTON_PLAY_':
-            await trade_session.play(
-                    window, values
-                )
-
         await asyncio.sleep(0)
+    window.close()
 
 
 async def ui(window, trade_session):
@@ -51,29 +69,11 @@ async def ui(window, trade_session):
     '''
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
-        event, values = window.read(timeout=10)
+        event, values = window.read(timeout=5)
 
-        if event == sg.WIN_CLOSED or event == 'Exit':
-            await trade_session.exit()
-            asyncio.get_running_loop().stop()
+        action = await event_listeners(event, values, window, trade_session)
+        if action == 'BR':
             break
-
-        if event == '_BUTTON_PAUSE_':
-            trade_session.pause(window)
-
-        if event == '_BUTTON_STOP_':
-            trade_session.stop(window)
-
-        if trade_session.loop:
-            bl = await trade_session.page.locator("#header__acc-balance").inner_text()
-            if bl:
-                cur_balance = float(bl.split()[0].replace(',',''))
-
-                stop_est = cur_balance - trade_session.start_balance
-
-                if stop_est > float(trade_session.stop_profit) or abs(stop_est) > float(trade_session.stop_loss):
-                    trade_session.loop = False
-                    window['_PLAY_STATUS_'].update('AUTO STOPPED!')
 
         await asyncio.sleep(0)
     window.close()
