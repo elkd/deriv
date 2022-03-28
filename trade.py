@@ -95,7 +95,7 @@ async def main(window, trade_session):
 
 
 if __name__ == '__main__':
-    sg.theme('BluePurple')
+    sg.theme('DarkAmber')
 
     layout = [
         [sg.Text(size=(30,1), key='_MESSAGE_')],
