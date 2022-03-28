@@ -1,6 +1,7 @@
 import os
 import asyncio
 import traceback
+from time import sleep
 from playwright.async_api import async_playwright
 from playwright._impl._api_types import TimeoutError as PWTimeoutError
 from prob import check_stop
@@ -18,7 +19,7 @@ class TradeSession:
 
         self.loop = self.paused = False
         self.playwright = self.browser = None
-        self.context = self.page = None
+        self.purchase_handle = self.context = self.page = None
 
 
     async def setup(self, window):
@@ -105,7 +106,7 @@ class TradeSession:
         storage = await self.context.storage_state(path="state.json")
 
 
-    async def tight_play(self, spot_balance_span, stake_input, purchase_handle):
+    async def tight_play(self, spot_balance_span, stake_input):
         '''
         Should run so fast, as fast as possible
         Noticeable compromises is the use of is for comparison of small ints
@@ -144,7 +145,7 @@ class TradeSession:
 
                 #Sleep will facilitate Waiting for the price to change
                 #Then we can move on to check if we won or fail
-                await asyncio.sleep(1.7)
+                sleep(0.2)
 
                 next_price = await spot_balance_span.inner_text()
                 #If the price spot didn't change yet
@@ -172,24 +173,24 @@ class TradeSession:
                     self.stake = round(self.stake * self.mtng + self.stake, 2)
 
                 print(f'The stake is updated to: {self.stake}')
-                await asyncio.sleep(1.7)
+                sleep(0.2)
                 await stake_input.fill(str(self.stake))
 
-                pbtn_visible = await purchase_handle.is_visible()
+                pbtn_visible = await self.purchase_handle.is_visible()
                 if not pbtn_visible:
                     try:
                         await self.page.locator("#close_confirmation_container").click()
                     except PWTimeoutError as e:
                         print('Purchase button is disabled by Deriv, waiting for activation to play...')
-                        await asyncio.sleep(8)
-                        return await self.tight_play(spot_balance_span, stake_input, purchase_handle)
+                        await asyncio.sleep(6)
+                        return await self.tight_play(spot_balance_span, stake_input)
 
                 prev_spot = next_price
             else:
                 #Wait for the tick spot price to change first
                 #Before moving to the next loop round
                 prev_spot = bid_spot
-                await asyncio.sleep(1.7)
+                await asyncio.sleep(0.2)
 
             #prev_spot = bid_spot
             await asyncio.sleep(0)
@@ -222,7 +223,7 @@ class TradeSession:
         stake_input = self.page.locator("#amount")
 
         #The use of handle is discouraged. But useful to check if element is_visible()
-        purchase_handle = await self.page.wait_for_selector('#purchase_button_top')
+        self.purchase_handle = await self.page.wait_for_selector('#purchase_button_top')
 
         sblnc = await self.page.locator("#header__acc-balance").inner_text()
         if sblnc:
@@ -241,11 +242,19 @@ class TradeSession:
             await asyncio.sleep(8)
 
         await asyncio.sleep(4)
-        status = await self.tight_play(spot_balance_span, stake_input, purchase_handle)
+        status = await self.tight_play(spot_balance_span, stake_input)
         if status == 'AS':
             window['_PLAY_STATUS_'].update('AUTO STOPPED!')
+
         elif status == 'BK':
             window['_PLAY_STATUS_'].update('PURCHASE BLOCKED!')
+
+        pbtn_visible = await self.purchase_handle.is_visible()
+        if not pbtn_visible:
+            try:
+                await self.page.locator("#close_confirmation_container").click()
+            except PWTimeoutError as e:
+                pass
 
 
 
