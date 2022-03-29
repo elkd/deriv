@@ -126,54 +126,59 @@ class TradeSession:
         }""")
         '''
 
-        #The initial bid_ldp will be false in the play check if span.innerText was ''
-        bid_ldp = prev_spot = None
+        bid_spot = prev_spot = None
         self.loop = True
 
         while self.loop:
             bid_spot = await spot_balance_span.inner_text()
-            if bid_spot:
-                while prev_spot == bid_spot:
-                    bid_spot = await spot_balance_span.inner_text()
 
-                bid_ldp = int(bid_spot[-1])
+            while prev_spot == bid_spot:
+                bid_spot = await spot_balance_span.inner_text()
 
-            if bid_ldp is self.ldp: #Play Check
+            if int(bid_spot[-1]) is self.ldp: #Play Check
                 #Once LDP is correct, purchase immediately,
                 #Deriv will schedule for the next price spot
                 await self.page.locator("#purchase_button_top").click()
 
+                print(f'PLAYING STAKE IS: {self.stake}')
+                bid_spot_purchase = await spot_balance_span.inner_text()
                 #Sleep will facilitate Waiting for the price to change
                 #Then we can move on to check if we won or fail
-                sleep(0.2)
+                sleep(0.1)
 
                 next_price = await spot_balance_span.inner_text()
                 #If the price spot didn't change yet
                 #try again to read the next_price
-                while next_price == bid_spot:
+                while next_price == bid_spot_purchase:
                     next_price = await spot_balance_span.inner_text()
 
-                bl = await self.page.locator("#header__acc-balance").inner_text()
-                if bl:
-                    cur_balance = float(bl.split()[0].replace(',',''))
+                print('**PRICES:', bid_spot, bid_spot_purchase, next_price, '**')
 
-                    stop_est = cur_balance - self.start_balance
+                if bid_spot == bid_spot_purchase:
+                    if int(next_price[-1]) is self.ldp:
+                        print('--FAST WON--')
+                        self.stake = self.init_stake
+                    else:
+                        print('FAST LOST!!!')
+                        self.stake = round(self.stake * self.mtng + self.stake, 2)
 
-                    if stop_est > float(self.stop_profit) or abs(stop_est) > float(self.stop_loss):
-                        self.loop = False
-                        return 'AS'
-
-                print(bid_spot, next_price, next_price[-1])
-
-                if int(next_price[-1]) is bid_ldp:
-                    print('--WON--')
-                    self.stake = self.init_stake
                 else:
-                    print('LOST!!!')
-                    self.stake = round(self.stake * self.mtng + self.stake, 2)
+                    #This sleep is to wait for the results, don't give access to evloop
+                    sleep(0.5)
+                    result_str = await self.page.locator("#contract_purchase_heading").inner_text()
+
+                    while result_str == 'Contract Confirmation':
+                        result_str = await self.page.locator("#contract_purchase_heading").inner_text()
+
+                    print(result_str)
+                    if result_str == "This contract won":
+                        print('--WON--')
+                        self.stake = self.init_stake
+                    elif result_str == "This contract lost":
+                        print('LOST!!!')
+                        self.stake = round(self.stake * self.mtng + self.stake, 2)
 
                 print(f'The stake is updated to: {self.stake}')
-                sleep(0.2)
                 await stake_input.fill(str(self.stake))
 
                 pbtn_visible = await self.purchase_handle.is_visible()
@@ -181,19 +186,25 @@ class TradeSession:
                     try:
                         await self.page.locator("#close_confirmation_container").click()
                     except PWTimeoutError as e:
-                        print('Purchase button is disabled by Deriv, waiting for activation to play...')
+                        print('Purchase button is disabled by Deriv, waiting for activation...')
                         await asyncio.sleep(6)
                         return await self.tight_play(spot_balance_span, stake_input)
 
                 prev_spot = next_price
             else:
+                #Check for stopping only when not playing
+                bl = await self.page.locator("#header__acc-balance").inner_text()
+                cur_balance = float(bl.split()[0].replace(',',''))
+
+                stop_est = cur_balance - self.start_balance
+                if stop_est > float(self.stop_profit) or abs(stop_est) > float(self.stop_loss):
+                    self.loop = False
+                    return 'AS'
+
                 #Wait for the tick spot price to change first
                 #Before moving to the next loop round
                 prev_spot = bid_spot
-                await asyncio.sleep(0.2)
-
-            #prev_spot = bid_spot
-            await asyncio.sleep(0)
+                await asyncio.sleep(0)
 
 
     async def play(self, window, values):

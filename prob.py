@@ -2,22 +2,19 @@ import asyncio
 
 
 async def check_stop(session, start_balance, stake):
-    ''' Compute new stake value
-    #Martingale should round off to 2 Decimal points {Formulae= (Stake*Martingale) + Stake
-	#Stop Loss= When total losses of stakes add up to the value or more
-	#Stop Profit= When profit reaches this value or more (using the account balance before start)
+    '''
+    Check wether to continue playing or not
+    The rule for this function is that it shouldn't be run often
+    Only when the Balance is approaching the stop loss/profit,
+    Then this function should be called more often
     '''
 
-    stake = float(stake)
+    bl = await session.page.locator("#header__acc-balance").inner_text()
+    if bl:
+        cur_balance = float(bl.split()[0].replace(',',''))
 
-    bl = await session.page.locator(
-            "#header__acc-balance"
-        ).inner_text()
-    cur_balance = bl.split()[0].replace(',','')
+        stop_est = cur_balance - session.start_balance
 
-    stop_est = float(cur_balance) - float(start_balance.replace(',',''))
-
-    if stop_est > float(session.stop_profit) or abs(stop_est) > float(session.stop_loss):
-        return None, stop_est
-
-    return stake*float(session.mtng), stop_est
+        if stop_est > float(session.stop_profit) or abs(stop_est) > float(session.stop_loss):
+            session.loop = False
+            return 'STOP'

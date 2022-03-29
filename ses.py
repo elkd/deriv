@@ -21,7 +21,7 @@ if __name__ == '__main__'
         print('The page is taking long to load please wait')
         sleep(10)
 
-    sleep(5)
+    sleep(8)
     spot_balance_span = page.locator("#spot")
     stake_input = page.locator("#amount")
 
@@ -30,37 +30,30 @@ if __name__ == '__main__'
 
 
     while True:
-        bid_spot = await spot_balance_span.inner_text()
-        if bid_spot:
-            while prev_spot == bid_spot:
-                bid_spot = await spot_balance_span.inner_text()
+        bid_spot = spot_balance_span.inner_text()
 
-            bid_ldp = int(bid_spot[-1])
+        bid_ldp = int(bid_spot[-1])
 
-        if bid_ldp is self.ldp: #Play Check
+        if bid_ldp is 8: #Play Check
             #Once LDP is correct, purchase immediately,
             #Deriv will schedule for the next price spot
-            await self.page.locator("#purchase_button_top").click()
+            page.locator("#purchase_button_top").click()
 
             #Sleep will facilitate Waiting for the price to change
             #Then we can move on to check if we won or fail
-            await asyncio.sleep(0.8)
+            #See https://github.com/microsoft/playwright/issues/4051
 
-            next_price = await spot_balance_span.inner_text()
+            await self.page.evaluate("""() => {
+                  new window.MutationObserver((mutations) => {
+                      if (mutation.addedNodes.length) {
+                        return;
+                      }
+                  }).observe(document.getElementById('spot'), { childList: true });
+            }""")
+
+            next_price 
             #If the price spot didn't change yet
             #try again to read the next_price
-            while next_price == bid_spot:
-                next_price = await spot_balance_span.inner_text()
-
-            bl = await self.page.locator("#header__acc-balance").inner_text()
-            if bl:
-                cur_balance = float(bl.split()[0].replace(',',''))
-
-                stop_est = cur_balance - self.start_balance
-
-                if stop_est > float(self.stop_profit) or abs(stop_est) > float(self.stop_loss):
-                    self.loop = False
-                    return 'AS'
 
             print(bid_spot, next_price, next_price[-1])
 
