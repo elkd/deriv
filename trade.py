@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 import traceback
+import uvloop
 import PySimpleGUI as sg
 from session import TradeSession
 
@@ -142,6 +143,7 @@ if __name__ == '__main__':
     trade_session = TradeSession()
 
     try:
+        uvloop.install()
         asyncio.run(main(window, trade_session))
     except Exception as e:
         print(traceback.format_exc())

@@ -146,7 +146,7 @@ class TradeSession:
                 try:
                     await self.page.locator("#purchase_button_top").click(timeout=100)
 
-                    print(f'PLAYING STAKE IS: {self.stake}')
+                    sleep(0.2)
                     bid_spot_purchase = await spot_balance_span.inner_text()
 
                     next_price = await spot_balance_span.inner_text()
@@ -192,10 +192,7 @@ class TradeSession:
 
                     pbtn_visible = await self.purchase_handle.is_visible()
                     if not pbtn_visible:
-                        await self.page.locator(
-                                "#close_confirmation_container"
-                            ).click(timeout=20000)
-
+                        await self.close_btn_handle.click()
                     prev_spot = next_price
 
                 except PWTimeoutError as e:
@@ -223,6 +220,9 @@ class TradeSession:
         Runs the smarttrader session with Volatility 100,
         Match/Differ option and Tick = 1
         '''
+
+        window['_PLAY_STATUS_'].update('PLAYING...')
+
         if not values['_SK_'] or not values['_MG_'] or not values['_LDP_']:
             window['_MESSAGE_'].update(
                     'Please provide LDP, Stake and initial Martingale'
@@ -231,6 +231,12 @@ class TradeSession:
 
         if self.paused:
             self.paused = False
+            xbtn_visible = await self.close_btn_handle.is_visible()
+            if xbtn_visible:
+                try:
+                    await self.close_btn_handle.click(timeout=2000)
+                except PWTimeoutError as e:
+                    pass
         else:
             #New Play session, take stake value from the user input
             self.stake = self.init_stake = float(values['_SK_'])
@@ -240,7 +246,6 @@ class TradeSession:
         self.stop_profit = float(values['_SP_'])
         self.ldp = int(values['_LDP_'])
 
-        window['_PLAY_STATUS_'].update('PLAYING...')
         spot_balance_span = self.page.locator("#spot")
         stake_input = self.page.locator("#amount")
 
@@ -278,9 +283,7 @@ class TradeSession:
         xbtn_visible = await self.close_btn_handle.is_visible()
         if xbtn_visible:
             try:
-                await self.page.locator(
-                        "#close_confirmation_container"
-                    ).click(timeout=3000)
+                await self.close_btn_handle.click(timeout=2000)
             except PWTimeoutError as e:
                 pass
 
