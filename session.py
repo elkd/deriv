@@ -144,13 +144,10 @@ class TradeSession:
                 #Once LDP is correct, purchase immediately,
                 #Deriv will schedule for the next price spot
                 try:
-                    await self.page.locator("#purchase_button_top").click(timeout=3000)
+                    await self.page.locator("#purchase_button_top").click(timeout=100)
 
                     print(f'PLAYING STAKE IS: {self.stake}')
                     bid_spot_purchase = await spot_balance_span.inner_text()
-                    #Sleep will facilitate Waiting for the price to change
-                    #Then we can move on to check if we won or fail
-                    sleep(0.1)
 
                     next_price = await spot_balance_span.inner_text()
                     #If the price spot didn't change yet
@@ -167,10 +164,9 @@ class TradeSession:
                         else:
                             print('FAST LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
-
                     else:
                         #This sleep is to wait for the results,
-                        #don't give access to event loop
+                        #don't give control back to the event loop
                         sleep(0.5)
                         result_str = await self.page.locator(
                                 "#contract_purchase_heading"
@@ -198,14 +194,14 @@ class TradeSession:
                     if not pbtn_visible:
                         await self.page.locator(
                                 "#close_confirmation_container"
-                            ).click(timeout=3000)
+                            ).click(timeout=20000)
 
                     prev_spot = next_price
 
                 except PWTimeoutError as e:
                     print(e)
                     print('Purchase btn is disabled by Deriv, waiting for activation...')
-                    await asyncio.sleep(6)
+                    await asyncio.sleep(5)
                     return await self.tight_play(spot_balance_span, stake_input)
 
             else:
@@ -274,7 +270,7 @@ class TradeSession:
         await asyncio.sleep(4)
         status = await self.tight_play(spot_balance_span, stake_input)
         if status == 'AS':
-            window['_PLAY_STATUS_'].update('AUTO STOPPED!')
+            window['_PLAY_STATUS_'].update('STOPPED!')
 
         elif status == 'BK':
             window['_PLAY_STATUS_'].update('PURCHASE BLOCKED!')

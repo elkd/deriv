@@ -49,7 +49,7 @@ async def bg(window, trade_session):
 
     while True:
         await asyncio.sleep(0)
-        event, values = window.read(timeout=5)
+        event, values = window.read(timeout=0)
 
         action = await event_listeners(event, values, window, trade_session)
         if action == 'BR':
@@ -66,7 +66,7 @@ async def ui(window, trade_session):
     '''
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
-        event, values = window.read(timeout=5)
+        event, values = window.read(timeout=0)
 
         if event == '_BUTTON_PLAY_':
             await trade_session.play(
