@@ -18,8 +18,8 @@ class TradeSession:
         self.stake = self.init_stake = 0.35
 
         self.loop = self.paused = False
-        self.playwright = self.browser = None
-        self.purchase_handle = self.context = self.page = None
+        self.purchase_handle = self.close_btn_handle = None
+        self.playwright = self.browser = self.context = self.page = None
 
 
     async def setup(self, window):
@@ -54,7 +54,6 @@ class TradeSession:
         try:
             await self.page.goto("https://smarttrader.deriv.com/")
         except PWTimeoutError as e:
-            #traceback.format_exc()
             print('The page is taking long to load please wait')
             await asyncio.sleep(10)
 
@@ -76,12 +75,16 @@ class TradeSession:
             lg_btn = self.page.locator("#btn__login") or self.page.locator("text=Log in")
             await lg_btn.click()
             # Click [placeholder="example\@email\.com"]
-            email_input = self.page.locator('#txtEmail') or self.page.locator("[placeholder=\"example\\@email\\.com\"]")
+            email_input = self.page.locator('#txtEmail') or self.page.locator(
+                        "[placeholder=\"example\\@email\\.com\"]"
+                    )
             await email_input.fill(email)
 
             await asyncio.sleep(3)
 
-            psword_input = self.page.locator('#txtPass') or self.page.locator("input[name=\"password\"]")
+            psword_input = self.page.locator('#txtPass') or self.page.locator(
+                        "input[name=\"password\"]"
+                    )
 
             # Fill input[name="password"]
             await psword_input.fill(psword)
@@ -96,7 +99,9 @@ class TradeSession:
         # Click button:has-text("Log in")
         # with page.expect_navigation(url="https://smarttrader.deriv.com/en/trading.html"):
         async with self.page.expect_navigation():
-            submit_btn = self.page.locator('button.button.secondary') or self.page.locator('input[name="login"]')
+            submit_btn = self.page.locator(
+                    'button.button.secondary'
+                ) or self.page.locator('input[name="login"]')
             await submit_btn.click()
             #page.locator("button:has-text(\"Log in\")").click()
 
@@ -126,7 +131,7 @@ class TradeSession:
         }""")
         '''
 
-        bid_spot = prev_spot = None
+        bid_spot = prev_spot = ''
         self.loop = True
 
         while self.loop:
@@ -138,61 +143,74 @@ class TradeSession:
             if int(bid_spot[-1]) is self.ldp: #Play Check
                 #Once LDP is correct, purchase immediately,
                 #Deriv will schedule for the next price spot
-                await self.page.locator("#purchase_button_top").click()
+                try:
+                    await self.page.locator("#purchase_button_top").click(timeout=3000)
 
-                print(f'PLAYING STAKE IS: {self.stake}')
-                bid_spot_purchase = await spot_balance_span.inner_text()
-                #Sleep will facilitate Waiting for the price to change
-                #Then we can move on to check if we won or fail
-                sleep(0.1)
+                    print(f'PLAYING STAKE IS: {self.stake}')
+                    bid_spot_purchase = await spot_balance_span.inner_text()
+                    #Sleep will facilitate Waiting for the price to change
+                    #Then we can move on to check if we won or fail
+                    sleep(0.1)
 
-                next_price = await spot_balance_span.inner_text()
-                #If the price spot didn't change yet
-                #try again to read the next_price
-                while next_price == bid_spot_purchase:
                     next_price = await spot_balance_span.inner_text()
+                    #If the price spot didn't change yet
+                    #try again to read the next_price
+                    while next_price == bid_spot_purchase:
+                        next_price = await spot_balance_span.inner_text()
 
-                print('**PRICES:', bid_spot, bid_spot_purchase, next_price, '**')
+                    print('**PRICES:', bid_spot, bid_spot_purchase, next_price, '**')
 
-                if bid_spot == bid_spot_purchase:
-                    if int(next_price[-1]) is self.ldp:
-                        print('--FAST WON--')
-                        self.stake = self.init_stake
+                    if bid_spot == bid_spot_purchase:
+                        if int(next_price[-1]) is self.ldp:
+                            print('--FAST WON--')
+                            self.stake = self.init_stake
+                        else:
+                            print('FAST LOST!!!')
+                            self.stake = round(self.stake * self.mtng + self.stake, 2)
+
                     else:
-                        print('FAST LOST!!!')
-                        self.stake = round(self.stake * self.mtng + self.stake, 2)
+                        #This sleep is to wait for the results,
+                        #don't give access to event loop
+                        sleep(0.5)
+                        result_str = await self.page.locator(
+                                "#contract_purchase_heading"
+                            ).inner_text()
 
-                else:
-                    #This sleep is to wait for the results, don't give access to evloop
-                    sleep(0.5)
-                    result_str = await self.page.locator("#contract_purchase_heading").inner_text()
+                        while result_str == 'Contract Confirmation':
+                            result_str = await self.page.locator(
+                                    "#contract_purchase_heading"
+                                ).inner_text()
 
-                    while result_str == 'Contract Confirmation':
-                        result_str = await self.page.locator("#contract_purchase_heading").inner_text()
+                        print(result_str)
+                        if result_str == "This contract won":
+                            print('--WON--')
+                            self.stake = self.init_stake
+                        elif result_str == "This contract lost":
+                            print('LOST!!!')
+                            self.stake = round(self.stake * self.mtng + self.stake, 2)
+                        else:
+                            print('@@The bot could not update stake@@')
 
-                    print(result_str)
-                    if result_str == "This contract won":
-                        print('--WON--')
-                        self.stake = self.init_stake
-                    elif result_str == "This contract lost":
-                        print('LOST!!!')
-                        self.stake = round(self.stake * self.mtng + self.stake, 2)
+                    print(f'The stake is updated to: {self.stake}')
+                    await stake_input.fill(str(self.stake))
 
-                print(f'The stake is updated to: {self.stake}')
-                await stake_input.fill(str(self.stake))
+                    pbtn_visible = await self.purchase_handle.is_visible()
+                    if not pbtn_visible:
+                        await self.page.locator(
+                                "#close_confirmation_container"
+                            ).click(timeout=3000)
 
-                pbtn_visible = await self.purchase_handle.is_visible()
-                if not pbtn_visible:
-                    try:
-                        await self.page.locator("#close_confirmation_container").click()
-                    except PWTimeoutError as e:
-                        print('Purchase button is disabled by Deriv, waiting for activation...')
-                        await asyncio.sleep(6)
-                        return await self.tight_play(spot_balance_span, stake_input)
+                    prev_spot = next_price
 
-                prev_spot = next_price
+                except PWTimeoutError as e:
+                    print(e)
+                    print('Purchase btn is disabled by Deriv, waiting for activation...')
+                    await asyncio.sleep(6)
+                    return await self.tight_play(spot_balance_span, stake_input)
+
             else:
-                #Check for stopping only when not playing
+                #Wait for the price tick to move forward
+                #Check for stopping profit/loss while waiting for the tick
                 bl = await self.page.locator("#header__acc-balance").inner_text()
                 cur_balance = float(bl.split()[0].replace(',',''))
 
@@ -201,10 +219,7 @@ class TradeSession:
                     self.loop = False
                     return 'AS'
 
-                #Wait for the tick spot price to change first
-                #Before moving to the next loop round
                 prev_spot = bid_spot
-                await asyncio.sleep(0)
 
 
     async def play(self, window, values):
@@ -233,8 +248,12 @@ class TradeSession:
         spot_balance_span = self.page.locator("#spot")
         stake_input = self.page.locator("#amount")
 
-        #The use of handle is discouraged. But useful to check if element is_visible()
-        self.purchase_handle = await self.page.wait_for_selector('#purchase_button_top')
+        self.purchase_handle = self.page.locator(
+                    '#purchase_button_top'
+                )
+        self.close_btn_handle = self.page.locator(
+                    "#close_confirmation_container"
+                )
 
         sblnc = await self.page.locator("#header__acc-balance").inner_text()
         if sblnc:
@@ -260,13 +279,14 @@ class TradeSession:
         elif status == 'BK':
             window['_PLAY_STATUS_'].update('PURCHASE BLOCKED!')
 
-        pbtn_visible = await self.purchase_handle.is_visible()
-        if not pbtn_visible:
+        xbtn_visible = await self.close_btn_handle.is_visible()
+        if xbtn_visible:
             try:
-                await self.page.locator("#close_confirmation_container").click()
+                await self.page.locator(
+                        "#close_confirmation_container"
+                    ).click(timeout=3000)
             except PWTimeoutError as e:
                 pass
-
 
 
     def pause(self, window):

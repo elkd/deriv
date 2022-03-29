@@ -14,9 +14,12 @@ def btn(name, key=secrets.token_urlsafe()):
 
 async def event_listeners(event, values, window, trade_session):
     '''
-    Both bg and ui tasks should be listening on all click events
-    So that there is no visible delay to the user on any click event
+    Both bg and ui tasks should be listening on all click events,
+    except the play event which must run only on 1 coroutine,
+    to avoid race conditions on pause and play scenarios.
+    There should be no visible delay to the user on pause, stop clicks
     '''
+
     if event == sg.WIN_CLOSED or event == 'Exit':
         await trade_session.exit()
         asyncio.get_running_loop().stop()
@@ -29,12 +32,6 @@ async def event_listeners(event, values, window, trade_session):
             window['_MESSAGE_'].update(
                     'Please provide Email and Password'
                 )
-
-    if event == '_BUTTON_PLAY_':
-        await trade_session.play(
-                window, values
-            )
-
     if event == '_BUTTON_PAUSE_':
         trade_session.pause(window)
 
@@ -70,6 +67,11 @@ async def ui(window, trade_session):
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
         event, values = window.read(timeout=5)
+
+        if event == '_BUTTON_PLAY_':
+            await trade_session.play(
+                    window, values
+                )
 
         action = await event_listeners(event, values, window, trade_session)
         if action == 'BR':
