@@ -134,6 +134,13 @@ class TradeSession:
         bid_spot = prev_spot = ''
         self.loop = True
 
+        xbtn_visible = await self.close_btn_handle.is_visible()
+        if xbtn_visible:
+            try:
+                await self.close_btn_handle.click(timeout=5000)
+            except PWTimeoutError:
+                pass
+
         while self.loop:
             bid_spot = await spot_balance_span.inner_text()
 
@@ -146,7 +153,7 @@ class TradeSession:
                 try:
                     await self.page.locator("#purchase_button_top").click(timeout=100)
 
-                    sleep(0.2)
+                    sleep(0.6)
                     bid_spot_purchase = await spot_balance_span.inner_text()
 
                     next_price = await spot_balance_span.inner_text()
