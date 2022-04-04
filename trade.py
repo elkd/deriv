@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 import traceback
+import signal
 import logging
 
 import uvloop
@@ -85,22 +86,30 @@ async def ui(window, trade_session):
 
 
 
-async def main(window, trade_session):
-    '''
-    Async Functions Main entry
+async def close_window(loop, signal=None):
+    if signal:
+        logging.info(f"Received exit signal {signal.name}...")
 
-    '''
-    try:
-        #can be asyncio.wait([ui(), bg()] without return value
-        res = await asyncio.gather(
-                ui(window, trade_session), bg(window, trade_session)
-            )
-    except Exception as e:
-        raise e
+    tasks = [t for t in asyncio.all_tasks() if t is not
+             asyncio.current_task()]
+
+    [task.cancel() for task in tasks]
+
+    logging.info(f"Cancelling {len(tasks)} outstanding tasks")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    loop.stop()
 
 
-if __name__ == '__main__':
 
+def exc_handler(loop, context):
+    #context["message"] always be present; context["exception"] is optional
+    msg = context.get("exception", context["message"])
+    logging.error(f"DerivBot Caught Exception: {msg}")
+    asyncio.create_task(close_window(loop))
+
+
+
+def main():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
@@ -148,12 +157,26 @@ if __name__ == '__main__':
                 finalize=True, resizable=True
             )
 
-    #Use it in different coros in the async loop
+    #Use it in 2 different coros in the async loop
     trade_session = TradeSession()
 
+    uvloop.install()
+    loop = asyncio.get_event_loop()
+    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+    for s in signals:
+        loop.add_signal_handler(
+            s, lambda s=s: asyncio.create_task(close_window(loop, signal=s)))
+    loop.set_exception_handler(exc_handler)
+
     try:
-        uvloop.install()
-        asyncio.run(main(window, trade_session))
-    except Exception as e:
-        logging.error(traceback.format_exc())
-        logging.info('The program has been halted!')
+        loop.create_task(ui(window, trade_session))
+        loop.create_task(bg(window, trade_session))
+        loop.run_forever()
+    finally:
+        loop.close()
+        logging.info("Finished running DerivBot")
+
+
+
+if __name__ == "__main__":
+    main()
