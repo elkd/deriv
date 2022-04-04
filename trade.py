@@ -1,6 +1,8 @@
 import asyncio
 import secrets
 import traceback
+import logging
+
 import uvloop
 import PySimpleGUI as sg
 from session import TradeSession
@@ -98,6 +100,13 @@ async def main(window, trade_session):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
     sg.theme('DarkAmber')
 
     layout = [
@@ -146,5 +155,5 @@ if __name__ == '__main__':
         uvloop.install()
         asyncio.run(main(window, trade_session))
     except Exception as e:
-        print(traceback.format_exc())
-        print('The program has been halted!')
+        logging.error(traceback.format_exc())
+        logging.info('The program has been halted!')

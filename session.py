@@ -1,6 +1,7 @@
 import os
 import asyncio
 import traceback
+import logging
 from time import sleep
 from playwright.async_api import async_playwright
 from playwright._impl._api_types import TimeoutError as PWTimeoutError
@@ -54,7 +55,7 @@ class TradeSession:
         try:
             await self.page.goto("https://smarttrader.deriv.com/")
         except PWTimeoutError as e:
-            print('The page is taking long to load please wait')
+            logging.info('The page is taking long to load please wait')
             await asyncio.sleep(10)
 
 
@@ -90,7 +91,7 @@ class TradeSession:
             await psword_input.fill(psword)
 
         except Exception as e:
-            print(e)
+            logging.info(e)
             window['_MESSAGE_'].update('Playwright Cannot Login!')
 
         await asyncio.sleep(7)
@@ -137,7 +138,7 @@ class TradeSession:
         xbtn_visible = await self.close_btn_handle.is_visible()
         if xbtn_visible:
             try:
-                await self.close_btn_handle.click(timeout=5000)
+                await self.close_btn_handle.click(timeout=3000)
             except PWTimeoutError:
                 pass
 
@@ -162,14 +163,14 @@ class TradeSession:
                     while next_price == bid_spot_purchase:
                         next_price = await spot_balance_span.inner_text()
 
-                    print('**PRICES:', bid_spot, bid_spot_purchase, next_price, '**')
+                    logging.info(f"**PRICES: {bid_spot}, {bid_spot_purchase}, {next_price}, **")
 
                     if bid_spot == bid_spot_purchase:
                         if int(next_price[-1]) is self.ldp:
-                            print('--FAST WON--')
+                            logging.info('--FAST WON--')
                             self.stake = self.init_stake
                         else:
-                            print('FAST LOST!!!')
+                            logging.info('FAST LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                     else:
                         #This sleep is to wait for the results,
@@ -184,17 +185,17 @@ class TradeSession:
                                     "#contract_purchase_heading"
                                 ).inner_text()
 
-                        print(result_str)
+                        logging.info(result_str)
                         if result_str == "This contract won":
-                            print('--WON--')
+                            logging.info('--WON--')
                             self.stake = self.init_stake
                         elif result_str == "This contract lost":
-                            print('LOST!!!')
+                            logging.info('LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                         else:
-                            print('@@The bot could not update stake@@')
+                            logging.info('@@The bot could not update stake@@')
 
-                    print(f'The stake is updated to: {self.stake}')
+                    logging.info(f'The stake is updated to: {self.stake}')
                     await stake_input.fill(str(self.stake))
 
                     pbtn_visible = await self.purchase_handle.is_visible()
@@ -203,8 +204,8 @@ class TradeSession:
                     prev_spot = next_price
 
                 except PWTimeoutError as e:
-                    print(e)
-                    print('Purchase btn is disabled by Deriv, waiting for activation...')
+                    logging.error(e)
+                    logging.info('Purchase btn is disabled by Deriv, waiting for activation...')
                     await asyncio.sleep(5)
                     return await self.tight_play(spot_balance_span, stake_input)
 
@@ -267,8 +268,8 @@ class TradeSession:
         if sblnc:
             self.start_balance = float(sblnc.split()[0].replace(',',''))
         else:
-            print('Sorry the Start Balance was never retrieved!')
-            print('PLEASE STOP THE PLAY MANUALLY!')
+            logging.info('Sorry the Start Balance was never retrieved!')
+            logging.info('PLEASE STOP THE PLAY MANUALLY!')
 
         try:
             await self.page.goto(
@@ -276,7 +277,7 @@ class TradeSession:
             )
         except PWTimeoutError as e:
             #traceback.format_exc()
-            print('The page is taking long to load please wait')
+            logging.info('The page is taking long to load please wait')
             await asyncio.sleep(8)
 
         await asyncio.sleep(4)
