@@ -84,5 +84,4 @@ celerybeat*
 
 *.sw*
 
-aliyun/
-search.txt
+logs.txt

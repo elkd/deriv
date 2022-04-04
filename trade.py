@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 import traceback
+import uvloop
 import PySimpleGUI as sg
 from session import TradeSession
 
@@ -14,9 +15,12 @@ def btn(name, key=secrets.token_urlsafe()):
 
 async def event_listeners(event, values, window, trade_session):
     '''
-    Both bg and ui tasks should be listening on all click events
-    So that there is no visible delay to the user on any click event
+    Both bg and ui tasks should be listening on all click events,
+    except the play event which must run only on 1 coroutine,
+    to avoid race conditions on pause and play scenarios.
+    There should be no visible delay to the user on pause, stop clicks
     '''
+
     if event == sg.WIN_CLOSED or event == 'Exit':
         await trade_session.exit()
         asyncio.get_running_loop().stop()
@@ -29,12 +33,6 @@ async def event_listeners(event, values, window, trade_session):
             window['_MESSAGE_'].update(
                     'Please provide Email and Password'
                 )
-
-    if event == '_BUTTON_PLAY_':
-        await trade_session.play(
-                window, values
-            )
-
     if event == '_BUTTON_PAUSE_':
         trade_session.pause(window)
 
@@ -52,7 +50,7 @@ async def bg(window, trade_session):
 
     while True:
         await asyncio.sleep(0)
-        event, values = window.read(timeout=5)
+        event, values = window.read(timeout=0)
 
         action = await event_listeners(event, values, window, trade_session)
         if action == 'BR':
@@ -69,7 +67,12 @@ async def ui(window, trade_session):
     '''
     while True:  # PysimpleGUI Event Loop
         await asyncio.sleep(0)
-        event, values = window.read(timeout=5)
+        event, values = window.read(timeout=0)
+
+        if event == '_BUTTON_PLAY_':
+            await trade_session.play(
+                    window, values
+                )
 
         action = await event_listeners(event, values, window, trade_session)
         if action == 'BR':
@@ -95,7 +98,7 @@ async def main(window, trade_session):
 
 
 if __name__ == '__main__':
-    sg.theme('BluePurple')
+    sg.theme('DarkAmber')
 
     layout = [
         [sg.Text(size=(30,1), key='_MESSAGE_')],
@@ -140,7 +143,8 @@ if __name__ == '__main__':
     trade_session = TradeSession()
 
     try:
+        uvloop.install()
         asyncio.run(main(window, trade_session))
     except Exception as e:
-        #print(traceback.format_exc())
+        print(traceback.format_exc())
         print('The program has been halted!')
