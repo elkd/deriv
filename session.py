@@ -163,14 +163,11 @@ class TradeSession:
                     while next_price == bid_spot_purchase:
                         next_price = await spot_balance_span.inner_text()
 
-                    logging.debug(f"**PRICES: {bid_spot}, {bid_spot_purchase}, {next_price}, **")
 
                     if bid_spot == bid_spot_purchase:
                         if int(next_price[-1]) is self.ldp:
-                            logging.debug('--FAST WON--')
                             self.stake = self.init_stake
                         else:
-                            logging.debug('FAST LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                     else:
                         #don't give control back to the event loop
@@ -188,16 +185,13 @@ class TradeSession:
 
                         self.play_reg = 0
                         if result_str == "This contract won":
-                            logging.debug('--SLOW WON--')
                             self.stake = self.init_stake
                         elif result_str == "This contract lost":
-                            logging.debug('SLOW LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                         else:
-                            logging.info('@@The bot could not update stake@@')
+                            logging.info('**The bot could not update stake**')
                             raise PWTimeoutError
 
-                    logging.debug(f'The stake is updated to: {self.stake}')
                     await stake_input.fill(str(self.stake))
 
                     pbtn_visible = await self.purchase_handle.is_visible()
