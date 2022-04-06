@@ -102,16 +102,27 @@ async def close_window(loop, signal=None):
 
 
 def exc_handler(loop, context):
-    #context["message"] always be present; context["exception"] is optional
-    msg = context.get("exception", context["message"])
-    logging.error(f"DerivBot Caught Exception: {msg}")
+    '''Callable with arguments active loop and exception dict
+
+    Context dict contains the following keys (highlight few)
+    ‘message’: Error message; Always be present
+    ‘exception’ (optional): Exception object;
+    ‘future’ (optional): asyncio.Future instance;
+    ‘task’ (optional): asyncio.Task instance;
+    ‘handle’ (optional): asyncio.Handle instance;
+    '''
+    exc_info = context.get("exception", context["message"])
+    #if isinstance(exc_info, Exception):
+        #logging.error(f"DerivBot Caught Exception: {exc_info}")
+    traceback.format_exc()
+    logging.error(f"DerivBot Caught Exception: {exc_info}")
     asyncio.create_task(close_window(loop))
 
 
 
 def main():
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
@@ -160,8 +171,7 @@ def main():
     #Use it in 2 different coros in the async loop
     trade_session = TradeSession()
 
-    uvloop.install()
-    loop = asyncio.get_event_loop()
+    loop = uvloop.new_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
     for s in signals:
         loop.add_signal_handler(

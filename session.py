@@ -15,7 +15,8 @@ class TradeSession:
         self.mtng = self.start_balance = 0.1
 
         #self.ldp must always be an integer
-        self.ldp = 0
+        #play_reg is a register to avoid infinity loops
+        self.ldp = self.play_reg = 0
         self.stake = self.init_stake = 0.35
 
         self.loop = self.paused = False
@@ -133,6 +134,7 @@ class TradeSession:
         '''
 
         bid_spot = prev_spot = ''
+        self.play_reg = 0
         self.loop = True
 
         xbtn_visible = await self.close_btn_handle.is_visible()
@@ -149,10 +151,8 @@ class TradeSession:
                 bid_spot = await spot_balance_span.inner_text()
 
             if int(bid_spot[-1]) is self.ldp: #Play Check
-                #Once LDP is correct, purchase immediately,
-                #Deriv will schedule for the next price spot
                 try:
-                    await self.page.locator("#purchase_button_top").click(timeout=100)
+                    await self.page.locator("#purchase_button_top").click(timeout=500)
 
                     sleep(0.6)
                     bid_spot_purchase = await spot_balance_span.inner_text()
@@ -163,39 +163,41 @@ class TradeSession:
                     while next_price == bid_spot_purchase:
                         next_price = await spot_balance_span.inner_text()
 
-                    logging.info(f"**PRICES: {bid_spot}, {bid_spot_purchase}, {next_price}, **")
+                    logging.debug(f"**PRICES: {bid_spot}, {bid_spot_purchase}, {next_price}, **")
 
                     if bid_spot == bid_spot_purchase:
                         if int(next_price[-1]) is self.ldp:
-                            logging.info('--FAST WON--')
+                            logging.debug('--FAST WON--')
                             self.stake = self.init_stake
                         else:
-                            logging.info('FAST LOST!!!')
+                            logging.debug('FAST LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                     else:
-                        #This sleep is to wait for the results,
                         #don't give control back to the event loop
                         sleep(0.5)
                         result_str = await self.page.locator(
                                 "#contract_purchase_heading"
                             ).inner_text()
 
-                        while result_str == 'Contract Confirmation':
+                        while self.play_reg < 8 and result_str == 'Contract Confirmation':
                             result_str = await self.page.locator(
                                     "#contract_purchase_heading"
                                 ).inner_text()
+                            sleep(self.play_reg/10)
+                            self.play_reg += 1
 
-                        logging.info(result_str)
+                        self.play_reg = 0
                         if result_str == "This contract won":
-                            logging.info('--WON--')
+                            logging.debug('--SLOW WON--')
                             self.stake = self.init_stake
                         elif result_str == "This contract lost":
-                            logging.info('LOST!!!')
+                            logging.debug('SLOW LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                         else:
                             logging.info('@@The bot could not update stake@@')
+                            raise PWTimeoutError
 
-                    logging.info(f'The stake is updated to: {self.stake}')
+                    logging.debug(f'The stake is updated to: {self.stake}')
                     await stake_input.fill(str(self.stake))
 
                     pbtn_visible = await self.purchase_handle.is_visible()
@@ -206,7 +208,7 @@ class TradeSession:
                 except PWTimeoutError as e:
                     logging.error(e)
                     logging.info('Purchase btn is disabled by Deriv, waiting for activation...')
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(4)
                     return await self.tight_play(spot_balance_span, stake_input)
 
             else:
@@ -276,7 +278,6 @@ class TradeSession:
                 f"https://smarttrader.deriv.com/en/trading.html?currency=USD&market=synthetic_index&underlying=R_100&formname=matchdiff&date_start=now&duration_amount=1&duration_units=t&amount={self.stake}&amount_type=stake&expiry_type=duration&prediction={self.ldp}"
             )
         except PWTimeoutError as e:
-            #traceback.format_exc()
             logging.info('The page is taking long to load please wait')
             await asyncio.sleep(8)
 
