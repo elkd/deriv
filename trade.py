@@ -85,7 +85,6 @@ async def ui(window, trade_session):
     window.close()
 
 
-
 async def close_window(loop, signal=None):
     if signal:
         logging.info(f"Received exit signal {signal.name}...")
@@ -130,7 +129,7 @@ def main():
     sg.theme('DarkAmber')
 
     layout = [
-        [sg.Text(size=(30,1), key='_MESSAGE_')],
+        [sg.Text(size=(60,1), key='_MESSAGE_')],
 
         [sg.Text('Email'), sg.Input(size=(24,1), k='_EMAIL_'),
             sg.Text(size=(7,1)), sg.Text('Password'), sg.Input(size=(24,1), k='_PWORD_')],
@@ -181,6 +180,7 @@ def main():
     try:
         loop.create_task(ui(window, trade_session))
         loop.create_task(bg(window, trade_session))
+        loop.create_task(trade_session.flush_context(window, loop))
         loop.run_forever()
     finally:
         loop.close()
