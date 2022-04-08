@@ -44,16 +44,16 @@ class TradeSession:
             self.playwright = await async_playwright().start()
             self.browser = await self.playwright.chromium.launch(headless=False)
 
-        if os.path.isfile(state):
-            # Create a new context with the saved storage state.
-            self.context = await self.browser.new_context(storage_state=state)
-            self.page = await self.context.new_page()
-        else:
+        if not os.path.isfile(state):
             window['_MESSAGE_'].update('Please Login First!')
             self.context = await self.browser.new_context()
-            self.page = await self.context.new_page()
+        else:
+            _context = await self.browser.new_context(storage_state=state)
+            if flush: await self.context.close()
+            self.context = _context
 
         try:
+            self.page = await self.context.new_page()
             await self.page.goto("https://smarttrader.deriv.com/")
         except PWTimeoutError as e:
             logging.info('The page is taking long to load please wait')
@@ -83,8 +83,6 @@ class TradeSession:
             self.loop = False
 
         await self.page.close()
-        await self.context.close()
-        #await self.browser.close()
 
         await self.setup(window, flush=True)
 
