@@ -85,7 +85,6 @@ async def ui(window, trade_session):
     window.close()
 
 
-
 async def close_window(loop, signal=None):
     if signal:
         logging.info(f"Received exit signal {signal.name}...")
@@ -102,16 +101,27 @@ async def close_window(loop, signal=None):
 
 
 def exc_handler(loop, context):
-    #context["message"] always be present; context["exception"] is optional
-    msg = context.get("exception", context["message"])
-    logging.error(f"DerivBot Caught Exception: {msg}")
+    '''Callable with arguments active loop and exception dict
+
+    Context dict contains the following keys (highlight few)
+    ‘message’: Error message; Always be present
+    ‘exception’ (optional): Exception object;
+    ‘future’ (optional): asyncio.Future instance;
+    ‘task’ (optional): asyncio.Task instance;
+    ‘handle’ (optional): asyncio.Handle instance;
+    '''
+    exc_info = context.get("exception", context["message"])
+    #if isinstance(exc_info, Exception):
+        #logging.error(f"DerivBot Caught Exception: {exc_info}")
+    traceback.format_exc()
+    logging.error(f"DerivBot Caught Exception: {exc_info}")
     asyncio.create_task(close_window(loop))
 
 
 
 def main():
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s,%(msecs)d %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
@@ -119,7 +129,7 @@ def main():
     sg.theme('DarkAmber')
 
     layout = [
-        [sg.Text(size=(30,1), key='_MESSAGE_')],
+        [sg.Text(size=(60,1), key='_MESSAGE_')],
 
         [sg.Text('Email'), sg.Input(size=(24,1), k='_EMAIL_'),
             sg.Text(size=(7,1)), sg.Text('Password'), sg.Input(size=(24,1), k='_PWORD_')],
@@ -160,8 +170,7 @@ def main():
     #Use it in 2 different coros in the async loop
     trade_session = TradeSession()
 
-    uvloop.install()
-    loop = asyncio.get_event_loop()
+    loop = uvloop.new_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
     for s in signals:
         loop.add_signal_handler(
@@ -171,6 +180,7 @@ def main():
     try:
         loop.create_task(ui(window, trade_session))
         loop.create_task(bg(window, trade_session))
+        loop.create_task(trade_session.flush_context(window, loop))
         loop.run_forever()
     finally:
         loop.close()

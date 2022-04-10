@@ -15,7 +15,8 @@ class TradeSession:
         self.mtng = self.start_balance = 0.1
 
         #self.ldp must always be an integer
-        self.ldp = 0
+        #play_reg is a register to avoid infinity loops
+        self.ldp = self.play_reg = 0
         self.stake = self.init_stake = 0.35
 
         self.loop = self.paused = False
@@ -23,45 +24,82 @@ class TradeSession:
         self.playwright = self.browser = self.context = self.page = None
 
 
-    async def setup(self, window):
+    async def setup(self, window, flush=False):
+        '''This is an extended init method
+
+        It creates the Playwright variables,
+        and attaches them to the session object.
         '''
-        This was supposed to go to init method
-        but a quick way to avoid a return on the init
-        '''
 
-        window['_MG_'].update(self.mtng)
-        window['_SL_'].update(self.stop_loss)
-        window['_SP_'].update(self.stop_profit)
-        window['_SK_'].update(self.init_stake)
+        state = ".state.json"
 
-        window['_LDP_'].update(self.ldp)
+        if not flush:
+            window['_MG_'].update(self.mtng)
+            window['_SL_'].update(self.stop_loss)
+            window['_SP_'].update(self.stop_profit)
+            window['_SK_'].update(self.init_stake)
 
+            window['_LDP_'].update(self.ldp)
 
-        self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=False)
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(headless=False)
 
-        state = "state.json"
-        await asyncio.sleep(0)
-
-        if os.path.isfile(state):
-            # Create a new context with the saved storage state.
-            self.context = await self.browser.new_context(storage_state=state)
-            self.page = await self.context.new_page()
-        else:
+        if not os.path.isfile(state):
             window['_MESSAGE_'].update('Please Login First!')
             self.context = await self.browser.new_context()
-            self.page = await self.context.new_page()
+        else:
+            _context = await self.browser.new_context(storage_state=state)
+            if flush: await self.context.close()
+            self.context = _context
 
         try:
+            self.page = await self.context.new_page()
             await self.page.goto("https://smarttrader.deriv.com/")
         except PWTimeoutError as e:
             logging.info('The page is taking long to load please wait')
             await asyncio.sleep(10)
 
 
+
+    async def flush_context(self, window, loop):
+        ''' A work around for the memory leak issue
+
+        '''
+        await asyncio.sleep(60 * 2)
+
+        window['_MESSAGE_'].update(
+            'THE BOT WILL RESTART IN 60 SECONDS, DONT CHANGE ANYTHING NOW'
+        )
+
+        #await asyncio.sleep(20)
+        window['_MESSAGE_'].update(
+            'RESTARTING THE APP TO CLEAR THE MEMORY...'
+        )
+
+        is_playing = self.loop
+        is_paused = self.paused
+
+        if is_playing:
+            self.loop = False
+
+        await self.page.close()
+
+        await self.setup(window, flush=True)
+
+        if is_playing:
+            await self.play(window, {}, flush=True)
+        if is_paused:
+            await self.play(window, {}, flush=True)
+            self.pause(window, values)
+
+        loop.create_task(self.flush_context(window, loop))
+        window['_MESSAGE_'].update('')
+        return
+
+
     async def login(self, email, psword, window):
         '''
-        Login if not logged in and then store the context into state.json
+        Login if not logged in and then store the context into .state.json
 
         '''
         #Best way to go about this is to check if state.json exists in path
@@ -109,7 +147,7 @@ class TradeSession:
         window['_MESSAGE_'].update('Logged in already!')
         await asyncio.sleep(3)
         # Save storage state into the file.
-        storage = await self.context.storage_state(path="state.json")
+        storage = await self.context.storage_state(path=".state.json")
 
 
     async def tight_play(self, spot_balance_span, stake_input):
@@ -133,6 +171,7 @@ class TradeSession:
         '''
 
         bid_spot = prev_spot = ''
+        self.play_reg = 0
         self.loop = True
 
         xbtn_visible = await self.close_btn_handle.is_visible()
@@ -149,11 +188,10 @@ class TradeSession:
                 bid_spot = await spot_balance_span.inner_text()
 
             if int(bid_spot[-1]) is self.ldp: #Play Check
-                #Once LDP is correct, purchase immediately,
-                #Deriv will schedule for the next price spot
                 try:
-                    await self.page.locator("#purchase_button_top").click(timeout=100)
+                    await self.page.locator("#purchase_button_top").click(timeout=500)
 
+                    #self.page.wait_for_timeout(600)
                     sleep(0.6)
                     bid_spot_purchase = await spot_balance_span.inner_text()
 
@@ -163,39 +201,36 @@ class TradeSession:
                     while next_price == bid_spot_purchase:
                         next_price = await spot_balance_span.inner_text()
 
-                    logging.info(f"**PRICES: {bid_spot}, {bid_spot_purchase}, {next_price}, **")
 
                     if bid_spot == bid_spot_purchase:
                         if int(next_price[-1]) is self.ldp:
-                            logging.info('--FAST WON--')
                             self.stake = self.init_stake
                         else:
-                            logging.info('FAST LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                     else:
-                        #This sleep is to wait for the results,
                         #don't give control back to the event loop
+                        #self.page.wait_for_timeout(600)
                         sleep(0.5)
                         result_str = await self.page.locator(
                                 "#contract_purchase_heading"
                             ).inner_text()
 
-                        while result_str == 'Contract Confirmation':
+                        while self.play_reg < 8 and result_str == 'Contract Confirmation':
                             result_str = await self.page.locator(
                                     "#contract_purchase_heading"
                                 ).inner_text()
+                            sleep(self.play_reg/10)
+                            self.play_reg += 1
 
-                        logging.info(result_str)
+                        self.play_reg = 0
                         if result_str == "This contract won":
-                            logging.info('--WON--')
                             self.stake = self.init_stake
                         elif result_str == "This contract lost":
-                            logging.info('LOST!!!')
                             self.stake = round(self.stake * self.mtng + self.stake, 2)
                         else:
-                            logging.info('@@The bot could not update stake@@')
+                            logging.info('**The bot could not update stake**')
+                            raise PWTimeoutError
 
-                    logging.info(f'The stake is updated to: {self.stake}')
                     await stake_input.fill(str(self.stake))
 
                     pbtn_visible = await self.purchase_handle.is_visible()
@@ -206,7 +241,7 @@ class TradeSession:
                 except PWTimeoutError as e:
                     logging.error(e)
                     logging.info('Purchase btn is disabled by Deriv, waiting for activation...')
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(4)
                     return await self.tight_play(spot_balance_span, stake_input)
 
             else:
@@ -223,36 +258,38 @@ class TradeSession:
                 prev_spot = bid_spot
 
 
-    async def play(self, window, values):
+    async def play(self, window, values, flush=False):
         '''
         Runs the smarttrader session with Volatility 100,
         Match/Differ option and Tick = 1
         '''
 
-        window['_PLAY_STATUS_'].update('PLAYING...')
+        if not flush:
+            window['_PLAY_STATUS_'].update('PLAYING...')
 
-        if not values['_SK_'] or not values['_MG_'] or not values['_LDP_']:
-            window['_MESSAGE_'].update(
-                    'Please provide LDP, Stake and initial Martingale'
-                )
-            return
+            if not values['_SK_'] or not values['_MG_'] or not values['_LDP_']:
+                window['_MESSAGE_'].update(
+                        'Please provide LDP, Stake and initial Martingale'
+                    )
+                return
 
-        if self.paused:
-            self.paused = False
-            xbtn_visible = await self.close_btn_handle.is_visible()
-            if xbtn_visible:
-                try:
-                    await self.close_btn_handle.click(timeout=2000)
-                except PWTimeoutError as e:
-                    pass
-        else:
-            #New Play session, take stake value from the user input
-            self.stake = self.init_stake = float(values['_SK_'])
+            if self.paused:
+                self.paused = False
+                xbtn_visible = await self.close_btn_handle.is_visible()
+                if xbtn_visible:
+                    try:
+                        await self.close_btn_handle.click(timeout=2000)
+                    except PWTimeoutError as e:
+                        pass
+            else:
+                #New Play session, take stake value from the user input
+                self.stake = self.init_stake = float(values['_SK_'])
 
-        self.mtng = float(values['_MG_'])
-        self.stop_loss = float(values['_SL_'])
-        self.stop_profit = float(values['_SP_'])
-        self.ldp = int(values['_LDP_'])
+            self.mtng = float(values['_MG_'])
+            self.stop_loss = float(values['_SL_'])
+            self.stop_profit = float(values['_SP_'])
+            self.ldp = int(values['_LDP_'])
+
 
         spot_balance_span = self.page.locator("#spot")
         stake_input = self.page.locator("#amount")
@@ -276,7 +313,6 @@ class TradeSession:
                 f"https://smarttrader.deriv.com/en/trading.html?currency=USD&market=synthetic_index&underlying=R_100&formname=matchdiff&date_start=now&duration_amount=1&duration_units=t&amount={self.stake}&amount_type=stake&expiry_type=duration&prediction={self.ldp}"
             )
         except PWTimeoutError as e:
-            #traceback.format_exc()
             logging.info('The page is taking long to load please wait')
             await asyncio.sleep(8)
 
